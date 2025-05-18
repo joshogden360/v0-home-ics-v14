@@ -1,23 +1,36 @@
 "use server"
 
-import { neon } from "@neondatabase/serverless"
+import { sql } from "@/lib/db"
 import type { Item } from "@/lib/types"
 
-const sql = neon(process.env.DATABASE_URL!)
-
+// Get all items
 export async function getItems(): Promise<Item[]> {
-  const items = await sql`
-    SELECT 
-      i.*, 
-      r.name as room_name
-    FROM 
-      items i
-    LEFT JOIN 
-      rooms r ON i.room_id = r.room_id
-    ORDER BY 
-      i.name ASC
-  `
-  return items
+  try {
+    const items = await sql`
+      SELECT i.*, 
+             r.room_id, 
+             r.name as room_name, 
+             r.floor_number
+      FROM items i
+      LEFT JOIN rooms r ON i.room_id = r.room_id
+      ORDER BY i.name
+    `
+
+    // Transform the flat result into nested objects
+    return items.map((item) => ({
+      ...item,
+      room: item.room_id
+        ? {
+            room_id: item.room_id,
+            name: item.room_name,
+            floor_number: item.floor_number,
+          }
+        : undefined,
+    }))
+  } catch (error) {
+    console.error("Error fetching items:", error)
+    return []
+  }
 }
 
 export async function getItemById(id: number): Promise<Item | null> {
