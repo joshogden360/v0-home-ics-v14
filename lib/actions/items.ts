@@ -12,6 +12,22 @@ export type ItemFormData = {
   purchase_price: string
   condition: string
   notes: string
+  // New fields
+  purchased_from: string
+  serial_number: string
+  warranty_provider: string
+  warranty_expiration: string
+  storage_location: string
+  current_value: string
+  depreciation_rate: string
+  has_insurance: string
+  insurance_provider: string
+  insurance_policy: string
+  insurance_coverage: string
+  insurance_category: string
+  needs_maintenance: string
+  maintenance_interval: string
+  maintenance_instructions: string
 }
 
 export async function createItem(formData: FormData) {
@@ -26,11 +42,16 @@ export async function createItem(formData: FormData) {
   const data = Object.fromEntries(formData.entries()) as unknown as ItemFormData & { room_id?: string }
 
   try {
-    // First, create the item
+    // First, create the item with all fields
     const result = await sql`
       INSERT INTO items (
         name, description, category, purchase_date, 
-        purchase_price, condition, notes
+        purchase_price, condition, notes,
+        purchased_from, serial_number, warranty_provider,
+        warranty_expiration, storage_location, current_value,
+        depreciation_rate, has_insurance, insurance_provider,
+        insurance_policy, insurance_coverage, insurance_category,
+        needs_maintenance, maintenance_interval, maintenance_instructions
       ) VALUES (
         ${name},
         ${data.description || null},
@@ -38,7 +59,22 @@ export async function createItem(formData: FormData) {
         ${data.purchase_date || null},
         ${data.purchase_price ? Number.parseFloat(data.purchase_price) : null},
         ${data.condition || null},
-        ${data.notes || null}
+        ${data.notes || null},
+        ${data.purchased_from || null},
+        ${data.serial_number || null},
+        ${data.warranty_provider || null},
+        ${data.warranty_expiration || null},
+        ${data.storage_location || null},
+        ${data.current_value ? Number.parseFloat(data.current_value) : null},
+        ${data.depreciation_rate ? Number.parseInt(data.depreciation_rate) : null},
+        ${data.has_insurance === "true" ? true : false},
+        ${data.insurance_provider || null},
+        ${data.insurance_policy || null},
+        ${data.insurance_coverage ? Number.parseFloat(data.insurance_coverage) : null},
+        ${data.insurance_category || null},
+        ${data.needs_maintenance === "true" ? true : false},
+        ${data.maintenance_interval ? Number.parseInt(data.maintenance_interval) : null},
+        ${data.maintenance_instructions || null}
       ) RETURNING item_id
     `
 
@@ -81,6 +117,89 @@ export async function createItem(formData: FormData) {
   }
 }
 
+export async function updateItem(id: number, formData: FormData) {
+  // Extract and validate the required fields
+  const name = formData.get("name") as string
+
+  if (!name || name.trim() === "") {
+    console.error("Item name is required")
+    return { success: false, error: "Item name is required" }
+  }
+
+  const data = Object.fromEntries(formData.entries()) as unknown as ItemFormData & { room_id?: string }
+
+  try {
+    // Update the item with all fields
+    await sql`
+      UPDATE items SET
+        name = ${name},
+        description = ${data.description || null},
+        category = ${data.category || null},
+        purchase_date = ${data.purchase_date || null},
+        purchase_price = ${data.purchase_price ? Number.parseFloat(data.purchase_price) : null},
+        condition = ${data.condition || null},
+        notes = ${data.notes || null},
+        purchased_from = ${data.purchased_from || null},
+        serial_number = ${data.serial_number || null},
+        warranty_provider = ${data.warranty_provider || null},
+        warranty_expiration = ${data.warranty_expiration || null},
+        storage_location = ${data.storage_location || null},
+        current_value = ${data.current_value ? Number.parseFloat(data.current_value) : null},
+        depreciation_rate = ${data.depreciation_rate ? Number.parseInt(data.depreciation_rate) : null},
+        has_insurance = ${data.has_insurance === "true" ? true : false},
+        insurance_provider = ${data.insurance_provider || null},
+        insurance_policy = ${data.insurance_policy || null},
+        insurance_coverage = ${data.insurance_coverage ? Number.parseFloat(data.insurance_coverage) : null},
+        insurance_category = ${data.insurance_category || null},
+        needs_maintenance = ${data.needs_maintenance === "true" ? true : false},
+        maintenance_interval = ${data.maintenance_interval ? Number.parseInt(data.maintenance_interval) : null},
+        maintenance_instructions = ${data.maintenance_instructions || null}
+      WHERE item_id = ${id}
+    `
+
+    // Update room location if provided
+    if (data.room_id) {
+      const roomId = Number.parseInt(data.room_id)
+
+      // Check if a location already exists for this item
+      const existingLocations = await sql`
+        SELECT location_id FROM locations WHERE item_id = ${id}
+      `
+
+      if (existingLocations.length > 0) {
+        // Update existing location
+        await sql`
+          UPDATE locations SET
+            room_id = ${roomId},
+            notes = 'Updated location'
+          WHERE item_id = ${id}
+        `
+      } else {
+        // Create new location
+        await sql`
+          INSERT INTO locations (
+            item_id, room_id, notes
+          ) VALUES (
+            ${id},
+            ${roomId},
+            'Initial placement'
+          )
+        `
+      }
+    }
+
+    revalidatePath(`/items/${id}`)
+    revalidatePath("/items")
+    return { success: true, id }
+  } catch (error) {
+    console.error("Error updating item:", error)
+    return {
+      success: false,
+      error: "Failed to update item: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
 export async function getItems() {
   try {
     // Updated query to use locations table for the room relationship
@@ -100,7 +219,9 @@ export async function getItems() {
 
 export async function getItemById(id: number) {
   try {
-    const items = await sql`SELECT * FROM items WHERE item_id = ${id}`
+    const items = await sql`
+      SELECT * FROM items WHERE item_id = ${id}
+    `
 
     if (items.length === 0) {
       return null

@@ -1,50 +1,74 @@
 "use client"
 
-import { DataTable } from "@/components/ui/data-table"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
+import { Input } from "@/components/ui/input"
+import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
+import Link from "next/link"
 
-// Define a simplified room type for the client component
-interface RoomTableItem {
-  id: string
+// Define the type for the processed room data
+interface ProcessedRoom {
+  id: number
   name: string
-  floor_number: number | null
-  area_sqft: number | null
+  floor: number
+  area: string
+  itemCount: number
   url: string
 }
 
-export function RoomsTable({ rooms }: { rooms: RoomTableItem[] }) {
-  const columns: ColumnDef<RoomTableItem>[] = [
-    {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => (
-        <Link href={row.original.url} className="font-medium hover:underline">
-          {row.getValue("name")}
-        </Link>
-      ),
-    },
-    {
-      accessorKey: "floor_number",
-      header: "Floor",
-    },
-    {
-      accessorKey: "area_sqft",
-      header: "Area (sq ft)",
-      cell: ({ row }) => row.original.area_sqft || "Unknown",
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <Link href={row.original.url}>
-          <Button variant="ghost" size="sm">
-            View
-          </Button>
-        </Link>
-      ),
-    },
-  ]
+// Define the columns for the DataTable
+const columns: ColumnDef<ProcessedRoom>[] = [
+  {
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => (
+      <Link href={row.original.url} className="font-medium hover:underline">
+        {row.getValue("name")}
+      </Link>
+    ),
+  },
+  {
+    accessorKey: "floor",
+    header: "Floor",
+  },
+  {
+    accessorKey: "area",
+    header: "Area",
+  },
+  {
+    accessorKey: "itemCount",
+    header: "Items",
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <Link href={row.original.url}>
+        <Button variant="ghost" size="sm">
+          View
+        </Button>
+      </Link>
+    ),
+  },
+]
 
-  return <DataTable columns={columns} data={rooms} searchKey="name" />
+export function RoomsTable({ rooms }: { rooms: ProcessedRoom[] }) {
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Filter rooms based on search query
+  const filteredRooms = rooms.filter((room) => room.name.toLowerCase().includes(searchQuery.toLowerCase()))
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Input
+          placeholder="Search rooms..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+      <DataTable columns={columns} data={filteredRooms} />
+    </div>
+  )
 }
