@@ -28,3 +28,24 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Local Development
+
+### Prerequisites
+
+- **Node.js** 18 or later
+- **PNPM** installed globally
+
+### Setup
+
+```bash
+pnpm install
+```
+
+### Start the development server
+
+```bash
+pnpm dev
+```
+
+Copy [`.env.example`](./.env.example) to `.env` and update the required variables (e.g. `DATABASE_URL`) before running the app.
