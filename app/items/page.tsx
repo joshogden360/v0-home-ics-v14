@@ -11,45 +11,69 @@ export default async function ItemsPage() {
   // Fetch items data
   const items = await getItems()
 
+  // Define the columns configuration
   const columns: ColumnDef<Item>[] = [
     {
       accessorKey: "name",
       header: "Name",
-      cell: ({ row }) => (
-        <Link href={`/items/${row.original.item_id}`} className="font-medium hover:underline">
-          {row.original.name}
-        </Link>
-      ),
+      cell: ({ row }) => {
+        // Pre-compute the href to avoid passing functions to client components
+        const href = `/items/${row.original.item_id}`
+        const name = row.original.name
+        return (
+          <Link href={href} className="font-medium hover:underline">
+            {name}
+          </Link>
+        )
+      },
     },
     {
       accessorKey: "category",
       header: "Category",
-      cell: ({ row }) => row.original.category || "Uncategorized",
+      cell: ({ row }) => {
+        // Pre-compute the value to avoid passing functions
+        return row.original.category || "Uncategorized"
+      },
     },
     {
       accessorKey: "purchase_date",
       header: "Purchase Date",
-      cell: ({ row }) => formatDate(row.original.purchase_date),
+      cell: ({ row }) => {
+        // Pre-compute the formatted date
+        const formattedDate = formatDate(row.original.purchase_date)
+        return formattedDate
+      },
     },
     {
       accessorKey: "purchase_price",
       header: "Price",
-      cell: ({ row }) => formatCurrency(row.original.purchase_price),
+      cell: ({ row }) => {
+        // Pre-compute the formatted price
+        const formattedPrice = formatCurrency(row.original.purchase_price)
+        return formattedPrice
+      },
     },
     {
       accessorKey: "condition",
       header: "Condition",
-      cell: ({ row }) => row.original.condition || "Unknown",
+      cell: ({ row }) => {
+        // Pre-compute the value
+        return row.original.condition || "Unknown"
+      },
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <Link href={`/items/${row.original.item_id}`}>
-          <Button variant="ghost" size="sm">
-            View
-          </Button>
-        </Link>
-      ),
+      cell: ({ row }) => {
+        // Pre-compute the href
+        const href = `/items/${row.original.item_id}`
+        return (
+          <Link href={href}>
+            <Button variant="ghost" size="sm">
+              View
+            </Button>
+          </Link>
+        )
+      },
     },
   ]
 

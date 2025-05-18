@@ -1,31 +1,37 @@
 "use client"
 
-import { useState } from "react"
+import * as React from "react"
 import {
   type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
   flexRender,
   getCoreRowModel,
-  getPaginationRowModel,
-  useReactTable,
-  type SortingState,
-  getSortedRowModel,
-  type ColumnFiltersState,
   getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
 } from "@tanstack/react-table"
-
+import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   searchKey?: string
+  searchPlaceholder?: string
 }
 
-export function DataTable<TData, TValue>({ columns, data, searchKey }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+  searchKey,
+  searchPlaceholder = "Search...",
+}: DataTableProps<TData, TValue>) {
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
 
   const table = useReactTable({
     data,
@@ -47,7 +53,7 @@ export function DataTable<TData, TValue>({ columns, data, searchKey }: DataTable
       {searchKey && (
         <div className="flex items-center py-4">
           <Input
-            placeholder="Search..."
+            placeholder={searchPlaceholder}
             value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
             onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
             className="max-w-sm"
@@ -89,11 +95,27 @@ export function DataTable<TData, TValue>({ columns, data, searchKey }: DataTable
         </Table>
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.setPageIndex(0)}
+          disabled={!table.getCanPreviousPage()}
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
         <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-          Previous
+          <ChevronLeft className="h-4 w-4" />
         </Button>
         <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+          disabled={!table.getCanNextPage()}
+        >
+          <ChevronsRight className="h-4 w-4" />
         </Button>
       </div>
     </div>
