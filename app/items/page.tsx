@@ -8,6 +8,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import type { Item } from "@/lib/types"
 
 export default async function ItemsPage() {
+  // Fetch items data
   const items = await getItems()
 
   const columns: ColumnDef<Item>[] = [

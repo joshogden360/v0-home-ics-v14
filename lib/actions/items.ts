@@ -1,154 +1,140 @@
 "use server"
 
-import { sql } from "@/lib/db"
-import { revalidatePath } from "next/cache"
+import { neon } from "@neondatabase/serverless"
+import type { Item } from "@/lib/types"
 
-export type ItemFormData = {
-  name: string
-  description: string
-  category: string
-  purchase_date: string
-  purchase_price: string
-  condition: string
-  notes: string
+const sql = neon(process.env.DATABASE_URL!)
+
+export async function getItems(): Promise<Item[]> {
+  const items = await sql`
+    SELECT 
+      i.*, 
+      r.name as room_name
+    FROM 
+      items i
+    LEFT JOIN 
+      rooms r ON i.room_id = r.room_id
+    ORDER BY 
+      i.name ASC
+  `
+  return items
+}
+
+export async function getItemById(id: number): Promise<Item | null> {
+  const [item] = await sql`
+    SELECT 
+      i.*, 
+      r.name as room_name
+    FROM 
+      items i
+    LEFT JOIN 
+      rooms r ON i.room_id = r.room_id
+    WHERE 
+      i.item_id = ${id}
+  `
+  return item || null
+}
+
+export async function getItem(id: string): Promise<Item | null> {
+  const [item] = await sql`
+    SELECT 
+      i.*, 
+      r.name as room_name
+    FROM 
+      items i
+    LEFT JOIN 
+      rooms r ON i.room_id = r.room_id
+    WHERE 
+      i.item_id = ${id}
+  `
+  return item || null
 }
 
 export async function createItem(formData: FormData) {
-  // Extract and validate the required fields
   const name = formData.get("name") as string
+  const description = formData.get("description") as string
+  const category = formData.get("category") as string
+  const roomId = formData.get("roomId") as string
+  const purchaseDate = formData.get("purchaseDate") as string
+  const purchasePrice = Number.parseFloat(formData.get("purchasePrice") as string)
+  const condition = formData.get("condition") as string
+  const notes = formData.get("notes") as string
 
-  if (!name || name.trim() === "") {
-    console.error("Item name is required")
-    return { success: false, error: "Item name is required" }
-  }
+  const [item] = await sql`
+    INSERT INTO items (
+      name, 
+      description, 
+      category, 
+      room_id, 
+      purchase_date, 
+      purchase_price, 
+      condition, 
+      notes
+    ) 
+    VALUES (
+      ${name}, 
+      ${description}, 
+      ${category}, 
+      ${roomId || null}, 
+      ${purchaseDate || null}, 
+      ${purchasePrice || null}, 
+      ${condition}, 
+      ${notes}
+    )
+    RETURNING *
+  `
 
-  const data = Object.fromEntries(formData.entries()) as unknown as ItemFormData & { room_id?: string }
-
-  try {
-    // First, create the item
-    const result = await sql`
-      INSERT INTO items (
-        name, description, category, purchase_date, 
-        purchase_price, condition, notes
-      ) VALUES (
-        ${name},
-        ${data.description || null},
-        ${data.category || null},
-        ${data.purchase_date || null},
-        ${data.purchase_price ? Number.parseFloat(data.purchase_price) : null},
-        ${data.condition || null},
-        ${data.notes || null}
-      ) RETURNING item_id
-    `
-
-    // Check if result exists and has the expected structure
-    if (!result || !Array.isArray(result) || result.length === 0) {
-      console.error("Unexpected result structure:", result)
-      return { success: false, error: "Failed to create item: Unexpected result structure" }
-    }
-
-    // Access the item_id safely
-    const itemId = result[0]?.item_id
-
-    if (!itemId) {
-      console.error("Item ID not found in result:", result)
-      return { success: false, error: "Failed to create item: Item ID not found" }
-    }
-
-    // If a room is selected, create a location entry
-    if (data.room_id) {
-      const roomId = Number.parseInt(data.room_id)
-      await sql`
-        INSERT INTO locations (
-          item_id, room_id, notes
-        ) VALUES (
-          ${itemId},
-          ${roomId},
-          'Initial placement'
-        )
-      `
-    }
-
-    revalidatePath("/items")
-    return { success: true, id: itemId }
-  } catch (error) {
-    console.error("Error creating item:", error)
-    return {
-      success: false,
-      error: "Failed to create item: " + (error instanceof Error ? error.message : String(error)),
-    }
-  }
+  return item
 }
 
-export async function getItems() {
-  try {
-    const items = await sql`SELECT * FROM items ORDER BY name ASC`
-    return items
-  } catch (error) {
-    console.error("Error fetching items:", error)
-    return []
-  }
+export async function updateItem(id: string, formData: FormData) {
+  const name = formData.get("name") as string
+  const description = formData.get("description") as string
+  const category = formData.get("category") as string
+  const roomId = formData.get("roomId") as string
+  const purchaseDate = formData.get("purchaseDate") as string
+  const purchasePrice = Number.parseFloat(formData.get("purchasePrice") as string)
+  const condition = formData.get("condition") as string
+  const notes = formData.get("notes") as string
+
+  const [item] = await sql`
+    UPDATE items
+    SET 
+      name = ${name}, 
+      description = ${description}, 
+      category = ${category}, 
+      room_id = ${roomId || null}, 
+      purchase_date = ${purchaseDate || null}, 
+      purchase_price = ${purchasePrice || null}, 
+      condition = ${condition}, 
+      notes = ${notes}
+    WHERE 
+      item_id = ${id}
+    RETURNING *
+  `
+
+  return item
 }
 
-export async function getItemById(id: number) {
-  try {
-    const items = await sql`SELECT * FROM items WHERE item_id = ${id}`
-
-    if (items.length === 0) {
-      return null
-    }
-
-    const item = items[0]
-
-    // Get related data
-    const media = await sql`SELECT * FROM media WHERE item_id = ${id}`
-
-    const locations = await sql`
-      SELECT l.*, r.name as room_name, r.floor_number 
-      FROM locations l
-      JOIN rooms r ON l.room_id = r.room_id
-      WHERE l.item_id = ${id}
-    `
-
-    const room =
-      locations.length > 0
-        ? {
-            room_id: locations[0].room_id,
-            name: locations[0].room_name,
-            floor_number: locations[0].floor_number,
-          }
-        : undefined
-
-    const tags = await sql`
-      SELECT t.* FROM tags t
-      JOIN item_tags it ON t.tag_id = it.tag_id
-      WHERE it.item_id = ${id}
-    `
-
-    const maintenance = await sql`
-      SELECT * FROM maintenance WHERE item_id = ${id}
-    `
-
-    return {
-      ...item,
-      room,
-      media,
-      tags,
-      maintenance,
-    }
-  } catch (error) {
-    console.error("Error fetching item details:", error)
-    return null
-  }
+export async function deleteItem(id: string) {
+  await sql`DELETE FROM items WHERE item_id = ${id}`
+  return { success: true }
 }
 
-export async function deleteItem(id: number) {
-  try {
-    await sql`DELETE FROM items WHERE item_id = ${id}`
-    revalidatePath("/items")
-    return { success: true }
-  } catch (error) {
-    console.error("Error deleting item:", error)
-    return { success: false, error: "Failed to delete item" }
-  }
+export async function getItemsByRoom(roomId: string): Promise<Item[]> {
+  const items = await sql`
+    SELECT * FROM items
+    WHERE room_id = ${roomId}
+    ORDER BY name ASC
+  `
+  return items
+}
+
+export async function getItemsWithoutRoom(): Promise<Item[]> {
+  const items = await sql`
+    SELECT * FROM items
+    WHERE room_id IS NULL
+    ORDER BY name ASC
+  `
+  return items
 }
