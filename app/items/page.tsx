@@ -1,81 +1,24 @@
 import { getItems } from "@/lib/actions/items"
 import { Button } from "@/components/ui/button"
-import { DataTable } from "@/components/ui/data-table"
 import { formatDate, formatCurrency } from "@/lib/utils"
 import Link from "next/link"
 import { Plus } from "lucide-react"
-import type { ColumnDef } from "@tanstack/react-table"
-import type { Item } from "@/lib/types"
+import ItemsTable from "./items-table"
 
 export default async function ItemsPage() {
   // Fetch items data
   const items = await getItems()
 
-  // Define the columns configuration
-  const columns: ColumnDef<Item>[] = [
-    {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => {
-        // Pre-compute the href to avoid passing functions to client components
-        const href = `/items/${row.original.item_id}`
-        const name = row.original.name
-        return (
-          <Link href={href} className="font-medium hover:underline">
-            {name}
-          </Link>
-        )
-      },
-    },
-    {
-      accessorKey: "category",
-      header: "Category",
-      cell: ({ row }) => {
-        // Pre-compute the value to avoid passing functions
-        return row.original.category || "Uncategorized"
-      },
-    },
-    {
-      accessorKey: "purchase_date",
-      header: "Purchase Date",
-      cell: ({ row }) => {
-        // Pre-compute the formatted date
-        const formattedDate = formatDate(row.original.purchase_date)
-        return formattedDate
-      },
-    },
-    {
-      accessorKey: "purchase_price",
-      header: "Price",
-      cell: ({ row }) => {
-        // Pre-compute the formatted price
-        const formattedPrice = formatCurrency(row.original.purchase_price)
-        return formattedPrice
-      },
-    },
-    {
-      accessorKey: "condition",
-      header: "Condition",
-      cell: ({ row }) => {
-        // Pre-compute the value
-        return row.original.condition || "Unknown"
-      },
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        // Pre-compute the href
-        const href = `/items/${row.original.item_id}`
-        return (
-          <Link href={href}>
-            <Button variant="ghost" size="sm">
-              View
-            </Button>
-          </Link>
-        )
-      },
-    },
-  ]
+  // Prepare the data for the client component
+  const preparedItems = items.map((item) => ({
+    id: item.item_id,
+    name: item.name,
+    category: item.category || "Uncategorized",
+    purchaseDate: formatDate(item.purchase_date),
+    purchasePrice: formatCurrency(item.purchase_price),
+    condition: item.condition || "Unknown",
+    viewUrl: `/items/${item.item_id}`,
+  }))
 
   return (
     <div className="space-y-6">
@@ -92,7 +35,7 @@ export default async function ItemsPage() {
         </Link>
       </div>
 
-      <DataTable columns={columns} data={items} searchKey="name" />
+      <ItemsTable items={preparedItems} />
     </div>
   )
 }
