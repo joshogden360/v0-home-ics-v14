@@ -1,44 +1,20 @@
 import { getRooms } from "@/lib/actions/rooms"
 import { Button } from "@/components/ui/button"
-import { DataTable } from "@/components/ui/data-table"
 import Link from "next/link"
 import { Plus } from "lucide-react"
-import type { ColumnDef } from "@tanstack/react-table"
-import type { Room } from "@/lib/types"
+import { RoomsTable } from "./rooms-table"
 
 export default async function RoomsPage() {
   const rooms = await getRooms()
 
-  const columns: ColumnDef<Room>[] = [
-    {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => (
-        <Link href={`/rooms/${row.original.room_id}`} className="font-medium hover:underline">
-          {row.original.name}
-        </Link>
-      ),
-    },
-    {
-      accessorKey: "floor_number",
-      header: "Floor",
-    },
-    {
-      accessorKey: "area_sqft",
-      header: "Area (sq ft)",
-      cell: ({ row }) => row.original.area_sqft || "Unknown",
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <Link href={`/rooms/${row.original.room_id}`}>
-          <Button variant="ghost" size="sm">
-            View
-          </Button>
-        </Link>
-      ),
-    },
-  ]
+  // Pre-process the rooms data for the client component
+  const roomsData = rooms.map((room) => ({
+    id: room.room_id.toString(),
+    name: room.name,
+    floor_number: room.floor_number,
+    area_sqft: room.area_sqft,
+    url: `/rooms/${room.room_id}`,
+  }))
 
   return (
     <div className="space-y-6">
@@ -55,7 +31,7 @@ export default async function RoomsPage() {
         </Link>
       </div>
 
-      <DataTable columns={columns} data={rooms} searchKey="name" />
+      <RoomsTable rooms={roomsData} />
     </div>
   )
 }
