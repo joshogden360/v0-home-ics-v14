@@ -27,10 +27,35 @@ export default function SignupPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
-    // TODO: Implement actual signup logic
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsSubmitting(false)
-    // On success, redirect or show success message
+
+    const form = e.target as HTMLFormElement
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value
+    const password = (form.elements.namedItem("password") as HTMLInputElement).value
+
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong")
+      }
+
+      // On success, redirect or show success message
+      // For now, just log success and clear the form
+      console.log("Signup successful:", data)
+      form.reset()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handlePhoneSignup = async (e: React.FormEvent) => {

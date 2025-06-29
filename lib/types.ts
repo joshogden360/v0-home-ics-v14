@@ -137,3 +137,11 @@ export type RoomFormData = {
   floor_number: string
   area_sqft: string | null
 }
+
+export interface User {
+  user_id: number
+  email: string
+  full_name: string | null
+  created_at: string
+  updated_at: string
+}
