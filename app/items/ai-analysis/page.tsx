@@ -1,12 +1,15 @@
+"use client"
+
 import { Metadata } from 'next'
 import { ImageAnalyzer } from '@/components/ai/image-analyzer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Zap, Brain, Camera, Sparkles } from 'lucide-react'
 
-export const metadata: Metadata = {
-  title: 'AI Item Analysis - The Itemizer',
-  description: 'Use AI to automatically detect and catalog items from photos',
-}
+// Note: Metadata is not supported in client components, move to layout if needed
+// export const metadata: Metadata = {
+//   title: 'AI Item Analysis - The Itemizer',
+//   description: 'Use AI to automatically detect and catalog items from photos',
+// }
 
 export default function AIAnalysisPage() {
   return (
