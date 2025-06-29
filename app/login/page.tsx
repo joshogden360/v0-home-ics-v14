@@ -38,8 +38,13 @@ export default function LoginPage() {
         name: 'Demo User'
       }
       
+      // Set the session token in both Jotai state and HTTP cookie
+      const sessionToken = 'mock-session-token-' + Date.now()
       setUser(mockUser)
-      setSessionToken('mock-session-token')
+      setSessionToken(sessionToken)
+      
+      // Set HTTP cookie for middleware
+      document.cookie = `session_token=${sessionToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
       
       showNotification({
         title: "Success",

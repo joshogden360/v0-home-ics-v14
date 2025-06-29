@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 export async function middleware(request: NextRequest) {
+  // Development bypass - remove this in production
+  if (process.env.NODE_ENV === 'development') {
+    // Allow access to all pages in development
+    return NextResponse.next()
+  }
+  
   const cookieStore = await cookies()
   const sessionToken = cookieStore.get("session_token")?.value
 
