@@ -24,4 +24,5 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.tsv0-home-ics-v14/
+next-env.d.ts
+v0-home-ics-v14/
