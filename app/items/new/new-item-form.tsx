@@ -32,56 +32,50 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import type { Room } from "@/lib/types"
+import {
+  itemFormAtom,
+  uploadedFilesAtom,
+  photoPreviewUrlsAtom,
+  documentPreviewNamesAtom,
+  clearItemFormAtom,
+  showNotificationAtom
+} from "@/lib/atoms/atoms"
+import { useAtom, useSetAtom } from "jotai"
 
 export function NewItemForm({ rooms }: { rooms: Room[] }) {
   const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("basic")
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
-  const [selectedWarrantyDate, setSelectedWarrantyDate] = useState<Date | undefined>(undefined)
-  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([])
-  const [selectedDocuments, setSelectedDocuments] = useState<File[]>([])
-  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
-  const [documentPreviewNames, setDocumentPreviewNames] = useState<string[]>([])
-  const [currentValue, setCurrentValue] = useState<number>(0)
-  const [purchasePrice, setPurchasePrice] = useState<number>(0)
-  const [hasInsurance, setHasInsurance] = useState(false)
+  const [formState, setFormState] = useAtom(itemFormAtom)
+  const [uploadedFiles, setUploadedFiles] = useAtom(uploadedFilesAtom)
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useAtom(photoPreviewUrlsAtom)
+  const [documentPreviewNames, setDocumentPreviewNames] = useAtom(documentPreviewNamesAtom)
+  const clearForm = useSetAtom(clearItemFormAtom)
+  const showNotification = useSetAtom(showNotificationAtom)
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const documentInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    category: "",
-    condition: "",
-    purchased_from: "",
-    serial_number: "",
-    warranty_provider: "",
-    storage_location: "",
-    notes: "",
-  })
-
   // Clear error when name is entered
   useEffect(() => {
-    if (formData.name && error && error.includes("name")) {
-      setError(null)
+    if (formState.formData.name && formState.error && formState.error.includes("name")) {
+      setFormState(prev => ({ ...prev, error: null }))
     }
-  }, [formData.name, error])
+  }, [formState.formData.name, formState.error, setFormState])
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setIsSubmitting(true)
-    setError(null)
+    setFormState(prev => ({ ...prev, isSubmitting: true, error: null }))
 
     try {
       // Validate required fields
-      if (!formData.name || formData.name.trim() === "") {
-        setError("Item name is required")
-        setActiveTab("basic") // Go back to the basic tab where the name field is
-        setIsSubmitting(false)
+      if (!formState.formData.name || formState.formData.name.trim() === "") {
+        setFormState(prev => ({ 
+          ...prev, 
+          error: "Item name is required",
+          activeTab: "basic",
+          isSubmitting: false
+        }))
         return
       }
 
@@ -89,34 +83,32 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
       const formDataObj = new FormData()
 
       // Explicitly add all form fields to ensure they're included
-      formDataObj.append("name", formData.name)
-      formDataObj.append("description", formData.description || "")
-      formDataObj.append("category", formData.category || "")
-      formDataObj.append("condition", formData.condition || "")
-      formDataObj.append("purchased_from", formData.purchased_from || "")
-      formDataObj.append("serial_number", formData.serial_number || "")
-      formDataObj.append("warranty_provider", formData.warranty_provider || "")
-      formDataObj.append("storage_location", formData.storage_location || "")
-      formDataObj.append("notes", formData.notes || "")
+      Object.entries(formState.formData).forEach(([key, value]) => {
+        formDataObj.append(key, value || "")
+      })
 
       // Add the purchase date from the selected date
-      if (selectedDate) {
-        formDataObj.append("purchase_date", format(selectedDate, "yyyy-MM-dd"))
+      if (formState.selectedDate) {
+        formDataObj.append("purchase_date", format(formState.selectedDate, "yyyy-MM-dd"))
       }
 
       // Add the warranty date from the selected warranty date
-      if (selectedWarrantyDate) {
-        formDataObj.append("warranty_expiration", format(selectedWarrantyDate, "yyyy-MM-dd"))
+      if (formState.selectedWarrantyDate) {
+        formDataObj.append("warranty_expiration", format(formState.selectedWarrantyDate, "yyyy-MM-dd"))
       }
 
       // Add the purchase price
-      formDataObj.append("purchase_price", purchasePrice.toString())
+      formDataObj.append("purchase_price", formState.purchasePrice.toString())
 
       // Add the current value
-      formDataObj.append("current_value", currentValue.toString())
+      formDataObj.append("current_value", formState.currentValue.toString())
 
       // Add insurance status
-      formDataObj.append("has_insurance", hasInsurance.toString())
+      formDataObj.append("has_insurance", formState.hasInsurance.toString())
+
+      // Add maintenance status
+      formDataObj.append("needs_maintenance", formState.needsMaintenance.toString())
+      formDataObj.append("maintenance_interval", formState.maintenanceInterval.toString())
 
       // Get room_id from the form if it exists
       if (formRef.current) {
@@ -130,57 +122,81 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
       const result = await createItem(formDataObj)
 
       if (result.success && result.id) {
+        showNotification({
+          title: "Success",
+          message: "Item created successfully",
+          type: "success"
+        })
+        clearForm()
         router.push(`/items/${result.id}`)
       } else {
         // Handle error
-        setError(result.error || "Failed to create item")
-        setIsSubmitting(false)
+        setFormState(prev => ({ 
+          ...prev, 
+          error: result.error || "Failed to create item",
+          isSubmitting: false
+        }))
       }
     } catch (error) {
       console.error("Error creating item:", error)
-      setError("An unexpected error occurred. Please try again.")
-      setIsSubmitting(false)
+      setFormState(prev => ({ 
+        ...prev, 
+        error: "An unexpected error occurred. Please try again.",
+        isSubmitting: false
+      }))
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    setFormState(prev => ({
+      ...prev,
+      formData: { ...prev.formData, [name]: value }
+    }))
 
     // Clear error when typing in the name field
-    if (name === "name" && value && error && error.includes("name")) {
-      setError(null)
+    if (name === "name" && value && formState.error && formState.error.includes("name")) {
+      setFormState(prev => ({ ...prev, error: null }))
     }
   }
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    setFormState(prev => ({
+      ...prev,
+      formData: { ...prev.formData, [name]: value }
+    }))
   }
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files)
-      setSelectedPhotos([...selectedPhotos, ...newFiles])
+      setUploadedFiles(prev => ({
+        ...prev,
+        photos: [...prev.photos, ...newFiles]
+      }))
 
       // Create preview URLs for the new photos
       const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file))
-      setPhotoPreviewUrls([...photoPreviewUrls, ...newPreviewUrls])
+      setPhotoPreviewUrls(prev => [...prev, ...newPreviewUrls])
     }
   }
 
   const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files)
-      setSelectedDocuments([...selectedDocuments, ...newFiles])
+      setUploadedFiles(prev => ({
+        ...prev,
+        documents: [...prev.documents, ...newFiles]
+      }))
 
       // Store document names for preview
       const newDocumentNames = newFiles.map((file) => file.name)
-      setDocumentPreviewNames([...documentPreviewNames, ...newDocumentNames])
+      setDocumentPreviewNames(prev => [...prev, ...newDocumentNames])
     }
   }
 
   const removePhoto = (index: number) => {
-    const updatedPhotos = [...selectedPhotos]
+    const updatedPhotos = [...uploadedFiles.photos]
     const updatedPreviewUrls = [...photoPreviewUrls]
 
     // Revoke the object URL to avoid memory leaks
@@ -189,18 +205,18 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
     updatedPhotos.splice(index, 1)
     updatedPreviewUrls.splice(index, 1)
 
-    setSelectedPhotos(updatedPhotos)
+    setUploadedFiles(prev => ({ ...prev, photos: updatedPhotos }))
     setPhotoPreviewUrls(updatedPreviewUrls)
   }
 
   const removeDocument = (index: number) => {
-    const updatedDocuments = [...selectedDocuments]
+    const updatedDocuments = [...uploadedFiles.documents]
     const updatedDocumentNames = [...documentPreviewNames]
 
     updatedDocuments.splice(index, 1)
     updatedDocumentNames.splice(index, 1)
 
-    setSelectedDocuments(updatedDocuments)
+    setUploadedFiles(prev => ({ ...prev, documents: updatedDocuments }))
     setDocumentPreviewNames(updatedDocumentNames)
   }
 
@@ -218,46 +234,45 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
 
   const nextTab = () => {
     // Only validate name when moving from basic tab
-    if (activeTab === "basic" && (!formData.name || formData.name.trim() === "")) {
-      setError("Item name is required")
+    if (formState.activeTab === "basic" && (!formState.formData.name || formState.formData.name.trim() === "")) {
+      setFormState(prev => ({ ...prev, error: "Item name is required" }))
       return
     }
 
-    if (activeTab === "basic") setActiveTab("details")
-    else if (activeTab === "details") setActiveTab("media")
-    else if (activeTab === "media") setActiveTab("location")
-    else if (activeTab === "location") setActiveTab("value")
-    else if (activeTab === "value") setActiveTab("maintenance")
+    const tabs = ["basic", "details", "media", "location", "value", "maintenance"]
+    const currentIndex = tabs.indexOf(formState.activeTab)
+    if (currentIndex < tabs.length - 1) {
+      setFormState(prev => ({ ...prev, activeTab: tabs[currentIndex + 1] }))
+    }
   }
 
   const prevTab = () => {
-    if (activeTab === "maintenance") setActiveTab("value")
-    else if (activeTab === "value") setActiveTab("location")
-    else if (activeTab === "location") setActiveTab("media")
-    else if (activeTab === "media") setActiveTab("details")
-    else if (activeTab === "details") setActiveTab("basic")
+    const tabs = ["basic", "details", "media", "location", "value", "maintenance"]
+    const currentIndex = tabs.indexOf(formState.activeTab)
+    if (currentIndex > 0) {
+      setFormState(prev => ({ ...prev, activeTab: tabs[currentIndex - 1] }))
+    }
   }
 
-  // Simplified date selection handlers
   const handleDateSelect = (date: Date | undefined) => {
-    setSelectedDate(date)
+    setFormState(prev => ({ ...prev, selectedDate: date }))
   }
 
   const handleWarrantyDateSelect = (date: Date | undefined) => {
-    setSelectedWarrantyDate(date)
+    setFormState(prev => ({ ...prev, selectedWarrantyDate: date }))
   }
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
-      {error && (
+      {formState.error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{formState.error}</AlertDescription>
         </Alert>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={formState.activeTab} onValueChange={(value) => setFormState(prev => ({ ...prev, activeTab: value }))} className="w-full">
         <TabsList className="grid grid-cols-6 w-full">
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
@@ -282,14 +297,14 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                   name="name"
                   required
                   aria-required="true"
-                  value={formData.name}
+                  value={formState.formData.name}
                   onChange={handleInputChange}
-                  className={`${error && error.includes("name") ? "border-red-500" : "border-input"}`}
-                  aria-invalid={error && error.includes("name") ? "true" : "false"}
+                  className={`${formState.error && formState.error.includes("name") ? "border-red-500" : "border-input"}`}
+                  aria-invalid={formState.error && formState.error.includes("name") ? "true" : "false"}
                 />
-                {error && error.includes("name") && (
+                {formState.error && formState.error.includes("name") && (
                   <p className="text-sm text-red-500" aria-live="polite">
-                    {error}
+                    {formState.error}
                   </p>
                 )}
               </div>
@@ -299,7 +314,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                   <Label htmlFor="category">Category</Label>
                   <Select
                     name="category"
-                    value={formData.category}
+                    value={formState.formData.category}
                     onValueChange={(value) => handleSelectChange("category", value)}
                   >
                     <SelectTrigger>
@@ -323,7 +338,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                   <Label htmlFor="condition">Condition</Label>
                   <Select
                     name="condition"
-                    value={formData.condition}
+                    value={formState.formData.condition}
                     onValueChange={(value) => handleSelectChange("condition", value)}
                   >
                     <SelectTrigger>
@@ -348,7 +363,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                   name="description"
                   rows={4}
                   placeholder="Describe your item..."
-                  value={formData.description}
+                  value={formState.formData.description}
                   onChange={handleInputChange}
                 />
               </div>
@@ -384,13 +399,13 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                         onClick={(e) => e.preventDefault()}
                       >
                         <Calendar className="mr-2 h-4 w-4" />
-                        {selectedDate ? format(selectedDate, "PPP") : "Select date"}
+                        {formState.selectedDate ? format(formState.selectedDate, "PPP") : "Select date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <CalendarComponent
                         mode="single"
-                        selected={selectedDate}
+                        selected={formState.selectedDate}
                         onSelect={handleDateSelect}
                         initialFocus
                       />
@@ -407,8 +422,8 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                       name="purchase_price"
                       type="number"
                       step="0.01"
-                      value={purchasePrice || ""}
-                      onChange={(e) => setPurchasePrice(Number(e.target.value))}
+                      value={formState.purchasePrice || ""}
+                      onChange={(e) => setFormState(prev => ({ ...prev, purchasePrice: Number(e.target.value) }))}
                     />
                   </div>
                 </div>
@@ -420,7 +435,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                   id="purchased_from"
                   name="purchased_from"
                   placeholder="Store or website name"
-                  value={formData.purchased_from}
+                  value={formState.formData.purchased_from}
                   onChange={handleInputChange}
                 />
               </div>
@@ -432,7 +447,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                     id="serial_number"
                     name="serial_number"
                     className="rounded-r-none"
-                    value={formData.serial_number}
+                    value={formState.formData.serial_number}
                     onChange={handleInputChange}
                   />
                   <Button
@@ -457,7 +472,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                     <Input
                       id="warranty_provider"
                       name="warranty_provider"
-                      value={formData.warranty_provider}
+                      value={formState.formData.warranty_provider}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -474,13 +489,13 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                           onClick={(e) => e.preventDefault()}
                         >
                           <Calendar className="mr-2 h-4 w-4" />
-                          {selectedWarrantyDate ? format(selectedWarrantyDate, "PPP") : "Select date"}
+                          {formState.selectedWarrantyDate ? format(formState.selectedWarrantyDate, "PPP") : "Select date"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
                         <CalendarComponent
                           mode="single"
-                          selected={selectedWarrantyDate}
+                          selected={formState.selectedWarrantyDate}
                           onSelect={handleWarrantyDateSelect}
                           initialFocus
                         />
@@ -492,7 +507,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
-                <Textarea id="notes" name="notes" rows={2} value={formData.notes} onChange={handleInputChange} />
+                <Textarea id="notes" name="notes" rows={2} value={formState.formData.notes} onChange={handleInputChange} />
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
@@ -652,7 +667,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                   id="storage_location"
                   name="storage_location"
                   placeholder="e.g., Blue Storage Box, Kitchen Cabinet"
-                  value={formData.storage_location}
+                  value={formState.formData.storage_location}
                   onChange={handleInputChange}
                 />
               </div>
@@ -709,8 +724,8 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
                     id="current_value"
                     type="number"
                     step="0.01"
-                    value={currentValue || ""}
-                    onChange={(e) => setCurrentValue(Number(e.target.value))}
+                    value={formState.currentValue || ""}
+                    onChange={(e) => setFormState(prev => ({ ...prev, currentValue: Number(e.target.value) }))}
                   />
                 </div>
               </div>
@@ -730,11 +745,11 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="has_insurance">Insured Item</Label>
-                  <Switch id="has_insurance" checked={hasInsurance} onCheckedChange={setHasInsurance} />
+                  <Switch id="has_insurance" checked={formState.hasInsurance} onCheckedChange={(value) => setFormState(prev => ({ ...prev, hasInsurance: value }))} />
                 </div>
               </div>
 
-              {hasInsurance && (
+              {formState.hasInsurance && (
                 <div className="space-y-4 border rounded-md p-4 bg-muted/20">
                   <div className="space-y-2">
                     <Label htmlFor="insurance_provider">Insurance Provider</Label>
@@ -793,13 +808,24 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="needs_maintenance">Requires Regular Maintenance</Label>
-                  <Switch id="needs_maintenance" name="needs_maintenance" />
+                  <Switch 
+                    id="needs_maintenance" 
+                    name="needs_maintenance" 
+                    checked={formState.needsMaintenance}
+                    onCheckedChange={(value) => setFormState(prev => ({ ...prev, needsMaintenance: value }))}
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="maintenance_interval">Recommended Maintenance Interval (days)</Label>
-                <Input id="maintenance_interval" name="maintenance_interval" type="number" />
+                <Input 
+                  id="maintenance_interval" 
+                  name="maintenance_interval" 
+                  type="number" 
+                  value={formState.maintenanceInterval}
+                  onChange={(e) => setFormState(prev => ({ ...prev, maintenanceInterval: Number(e.target.value) }))}
+                />
               </div>
 
               <div className="space-y-2">
@@ -827,8 +853,8 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
               <Button type="button" variant="outline" onClick={prevTab}>
                 Back
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Item"}
+              <Button type="submit" disabled={formState.isSubmitting}>
+                {formState.isSubmitting ? "Creating..." : "Create Item"}
               </Button>
             </CardFooter>
           </Card>
