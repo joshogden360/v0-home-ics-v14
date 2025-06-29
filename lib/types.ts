@@ -10,6 +10,23 @@ export interface Item {
   notes: string | null
   created_at: string
   updated_at: string
+  // Additional fields from the database
+  purchased_from: string | null
+  serial_number: string | null
+  warranty_provider: string | null
+  warranty_expiration: string | null
+  storage_location: string | null
+  current_value: number | null
+  depreciation_rate: number | null
+  has_insurance: boolean
+  insurance_provider: string | null
+  insurance_policy: string | null
+  insurance_coverage: number | null
+  insurance_category: string | null
+  needs_maintenance: boolean
+  maintenance_interval: number | null
+  maintenance_instructions: string | null
+  // Relations
   room?: {
     room_id: number
     name: string
