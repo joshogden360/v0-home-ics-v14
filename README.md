@@ -1,6 +1,6 @@
 # The Itemizer - AI-Powered Inventory Management System
 
-![Itemizer Hero](public/itemizer-v2-JPG.jpg)
+![Itemizer Hero](itemizer-hero.jpg)
 
 *An intelligent household inventory management system that transforms how you catalog, organize, and manage your belongings using cutting-edge AI technology.*
 
