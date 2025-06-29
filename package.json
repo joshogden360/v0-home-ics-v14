@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:migrate": "node -r dotenv/config ./scripts/migrate.js"
+    "db:migrate": "node -r dotenv/config ./db/scripts/migrate.js"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "latest",

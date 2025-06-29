@@ -5,7 +5,7 @@ const { drizzle } = require('drizzle-orm/neon-http');
 async function main() {
   const sql = neon(process.env.DATABASE_URL);
   const db = drizzle(sql);
-  await migrate(db, { migrationsFolder: './migrations' });
+  await migrate(db, { migrationsFolder: './db/migrations' });
   console.log('Migrations applied successfully.');
 }
 
