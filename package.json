@@ -12,6 +12,7 @@
     "@codemirror/lang-markdown": "latest",
     "@codemirror/state": "latest",
     "@codemirror/theme-one-dark": "latest",
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "latest",
     "@neondatabase/serverless": "latest",
     "@radix-ui/react-accordion": "1.2.2",

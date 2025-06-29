@@ -3,6 +3,7 @@
 import { sql } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import type { Item } from "@/lib/types"
+import type { DetectedItem } from "@/lib/services/ai-service"
 
 export type ItemFormData = {
   name: string
@@ -327,5 +328,60 @@ export async function getItemsWithoutRoom(): Promise<Item[]> {
   } catch (error) {
     console.error("Error fetching items without room:", error)
     return []
+  }
+}
+
+export async function addItemFromDetection(detectedItem: DetectedItem) {
+  try {
+    // Extract information from the detected item
+    const name = detectedItem.boundingBox.label || `${detectedItem.category} Item`
+    const description = detectedItem.description
+    const category = detectedItem.category
+    const condition = detectedItem.metadata?.condition || 'Unknown'
+    const estimatedValue = detectedItem.metadata?.estimatedValue
+    
+    // Parse estimated value if available
+    let currentValue = null
+    if (estimatedValue) {
+      // Try to extract numeric value from strings like "$10-20" or "$50"
+      const valueMatch = estimatedValue.match(/\$?(\d+(?:\.\d+)?)/);
+      if (valueMatch) {
+        currentValue = parseFloat(valueMatch[1]);
+      }
+    }
+
+    // Create the item
+    const result = await sql`
+      INSERT INTO items (
+        name, description, category, condition, current_value,
+        notes, created_at
+      ) VALUES (
+        ${name},
+        ${description},
+        ${category},
+        ${condition},
+        ${currentValue},
+        ${`Detected via AI analysis. Additional metadata: ${JSON.stringify(detectedItem.metadata || {})}`},
+        NOW()
+      ) RETURNING item_id
+    `
+
+    if (!result || !Array.isArray(result) || result.length === 0) {
+      throw new Error("Failed to create item: Unexpected result structure")
+    }
+
+    const itemId = result[0]?.item_id
+    if (!itemId) {
+      throw new Error("Failed to create item: Item ID not found")
+    }
+
+    revalidatePath("/items")
+    return { success: true, id: itemId }
+  } catch (error) {
+    console.error("Error creating item from detection:", error)
+    return {
+      success: false,
+      error: "Failed to create item: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }
