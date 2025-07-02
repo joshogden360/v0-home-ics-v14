@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:migrate": "node -r dotenv/config ./db/scripts/migrate.js"
+    "db:migrate": "node -r dotenv/config ./db/scripts/migrate.js",
+    "db:migrate-sql": "node -r dotenv/config ./db/scripts/migrate-sql.js"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.7.0",
