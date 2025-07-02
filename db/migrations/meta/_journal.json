@@ -1,5 +1,27 @@
 {
-  "version": "5",
-  "dialect": "pg",
-  "entries": []
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "1",
+      "when": 1700000000000,
+      "tag": "001_create_users_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "2", 
+      "when": 1700000001000,
+      "tag": "002_create_full_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "3",
+      "when": 1700000002000, 
+      "tag": "003_enable_row_level_security",
+      "breakpoints": true
+    }
+  ]
 }
