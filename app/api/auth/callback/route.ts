@@ -1,77 +1,92 @@
-import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { NextRequest } from 'next/server'
+import { redirect } from 'next/navigation'
+import { sql } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code")
+  const searchParams = request.nextUrl.searchParams
+  const code = searchParams.get('code')
+  const state = searchParams.get('state')
+  const error = searchParams.get('error')
 
+  // Handle Auth0 errors
+  if (error) {
+    console.error('Auth0 error:', error)
+    return redirect('/login?error=auth_failed')
+  }
+
+  // Check for authorization code
   if (!code) {
-    return NextResponse.json(
-      { error: "No authorization code provided." },
-      { status: 400 }
-    )
+    console.error('No authorization code received')
+    return redirect('/login?error=no_code')
   }
 
   try {
-    // Exchange the authorization code for an access token
-    const tokenResponse = await fetch(
-      "https://api.vercel.com/v2/oauth/access_token",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          client_id: process.env.NEXT_PUBLIC_STACK_PROJECT_ID!,
-          client_secret: process.env.STACK_SECRET_SERVER_KEY!,
-          code: code,
-          redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
-        }),
-      }
-    )
+    // Exchange authorization code for tokens
+    const auth0Domain = process.env.AUTH0_ISSUER_BASE_URL || 'https://dev-4h7fw2jrvhrwt542.us.auth0.com'
+    const clientId = process.env.AUTH0_CLIENT_ID!
+    const clientSecret = process.env.AUTH0_CLIENT_SECRET!
+    const redirectUri = `${process.env.AUTH0_BASE_URL || 'http://localhost:3000'}/api/auth/callback`
 
-    const tokenData = await tokenResponse.json()
+    const tokenResponse = await fetch(`${auth0Domain}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code,
+        redirect_uri: redirectUri,
+      }),
+    })
 
-    if (tokenData.error) {
-      return NextResponse.json(
-        { error: "Failed to fetch access token.", details: tokenData.error_description },
-        { status: 400 }
-      )
+    const tokens = await tokenResponse.json()
+
+    if (!tokenResponse.ok) {
+      console.error('Token exchange failed:', tokens)
+      return redirect('/login?error=token_exchange_failed')
     }
 
-    const accessToken = tokenData.access_token
-
-    // Use the access token to fetch user information
-    const userResponse = await fetch("https://api.vercel.com/v2/user", {
+    // Get user info
+    const userResponse = await fetch(`${auth0Domain}/userinfo`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${tokens.access_token}`,
       },
     })
 
-    const userData = await userResponse.json()
+    const userInfo = await userResponse.json()
 
     if (!userResponse.ok) {
-      return NextResponse.json(
-        { error: "Failed to fetch user data.", details: userData.error },
-        { status: 400 }
-      )
+      console.error('Failed to get user info:', userInfo)
+      return redirect('/login?error=user_info_failed')
     }
 
-    // Set the user session in cookies
-    const cookieStore = await cookies()
-    await cookieStore.set("session_token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 7, // 1 week
-      path: "/",
-    })
+    // Create or update user in database
+    try {
+      await sql`
+        INSERT INTO users (auth0_id, email, full_name, avatar_url, last_login)
+        VALUES (${userInfo.sub}, ${userInfo.email}, ${userInfo.name || null}, ${userInfo.picture || null}, NOW())
+        ON CONFLICT (auth0_id) DO UPDATE SET
+          email = EXCLUDED.email,
+          full_name = EXCLUDED.full_name,
+          avatar_url = EXCLUDED.avatar_url,
+          last_login = NOW(),
+          updated_at = NOW()
+      `
+      
+      console.log('✅ User synced with database:', userInfo.email)
+    } catch (dbError) {
+      console.error('❌ Failed to sync user with database:', dbError)
+      // Don't fail the login process, just log the error
+    }
 
-    // Redirect the user to the dashboard
-    return NextResponse.redirect(new URL("/", request.url))
+    // For now, redirect to dashboard with success
+    // In a real app, you'd set proper session cookies here
+    return redirect('/?login=success')
+
   } catch (error) {
-    console.error("OAuth callback error:", error)
-    return NextResponse.json(
-      { error: "An unexpected error occurred during authentication." },
-      { status: 500 }
-    )
+    console.error('Auth0 callback error:', error)
+    return redirect('/login?error=callback_failed')
   }
 } 
