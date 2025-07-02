@@ -6,13 +6,9 @@ export async function GET(request: Request) {
         // In production, this would come from your Auth0 session
         const testAuth0UserId = 'auth0|test_user_123';
 
-        const sql = neon(process.env.DATABASE_AUTHENTICATED_URL!, {
-            authToken: async () => {
-                // For now, return a dummy token for testing
-                // In production, this would be your actual Auth0 access token
-                return 'test-token';
-            },
-        });
+        // For initial testing, use the regular DATABASE_URL without authentication
+        // We'll test RLS functionality at the database level
+        const sql = neon(process.env.DATABASE_URL!);
 
         // Test 1: Set user context for RLS
         await sql`SELECT set_config('app.current_user_auth0_id', ${testAuth0UserId}, true)`;
@@ -49,9 +45,15 @@ export async function GET(request: Request) {
                 rlsFunction: rlsFunctionTest,
             },
             instructions: {
-                step1: 'Run your database migrations first',
-                step2: 'Create a test user in your database',
-                step3: 'Then this endpoint will work properly with RLS'
+                step1: 'Run your database migrations: npm run db:migrate',
+                step2: 'This test uses regular DATABASE_URL (not authenticated)',
+                step3: 'For full Auth0 + RLS: set up DATABASE_AUTHENTICATED_URL with valid JWT',
+                step4: 'Create a test user in your database to see RLS in action'
+            },
+            nextSteps: {
+                migrations: 'If migrations not run, RLS policies may not exist',
+                authentication: 'Currently testing basic RLS without Auth0 JWT',
+                fullSetup: 'Once working, switch to DATABASE_AUTHENTICATED_URL with Auth0 tokens'
             }
         });
 
@@ -60,7 +62,12 @@ export async function GET(request: Request) {
         return Response.json({ 
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
-            suggestion: 'Make sure your DATABASE_AUTHENTICATED_URL is set and migrations are run'
+            suggestions: [
+                'Make sure your DATABASE_URL is set in .env.local',
+                'Run database migrations: npm run db:migrate',
+                'Check that your Neon database is accessible',
+                'Verify your database connection string is correct'
+            ]
         }, { status: 500 });
     }
 } 
