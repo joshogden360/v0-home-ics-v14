@@ -86,6 +86,11 @@ export async function GET(request: NextRequest) {
     return redirect('/?login=success')
 
   } catch (error) {
+    // Check if this is a Next.js redirect (which is expected)
+    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+      throw error // Re-throw redirect errors
+    }
+    
     console.error('Auth0 callback error:', error)
     return redirect('/login?error=callback_failed')
   }
