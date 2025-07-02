@@ -2,9 +2,8 @@ import { neon } from '@neondatabase/serverless';
 
 export async function GET(request: Request) {
     try {
-        // For testing purposes, we'll simulate a user context
-        // In production, this would come from your Auth0 session
-        const testAuth0UserId = 'auth0|test_user_123';
+        // Using your real Auth0 test user ID
+        const testAuth0UserId = 'auth0|6865583112c808f8b0165602';
 
         // For initial testing, use the regular DATABASE_URL without authentication
         // We'll test RLS functionality at the database level
