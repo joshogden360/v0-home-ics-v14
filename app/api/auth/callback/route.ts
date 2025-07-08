@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     const auth0Domain = process.env.AUTH0_ISSUER_BASE_URL || 'https://dev-4h7fw2jrvhrwt542.us.auth0.com'
     const clientId = process.env.AUTH0_CLIENT_ID!
     const clientSecret = process.env.AUTH0_CLIENT_SECRET!
-    const redirectUri = `${process.env.AUTH0_BASE_URL || 'http://localhost:3000'}/api/auth/callback`
+    const baseUrl = (process.env.AUTH0_BASE_URL || 'http://localhost:3000').replace(/\/$/, '') // Remove trailing slash
+    const redirectUri = `${baseUrl}/api/auth/callback`
 
     const tokenResponse = await fetch(`${auth0Domain}/oauth/token`, {
       method: 'POST',

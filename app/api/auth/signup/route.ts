@@ -79,7 +79,8 @@ export async function GET(request: NextRequest) {
   // Construct Auth0 signup URL (with screen_hint=signup)
   const auth0Domain = process.env.AUTH0_ISSUER_BASE_URL?.replace('https://', '') || 'dev-4h71w2jrwhrwt542.us.auth0.com'
   const clientId = process.env.AUTH0_CLIENT_ID || 'RNYHVZ13K3G23pTmrw8c8gNclcVnyYx1'
-  const redirectUri = encodeURIComponent(`${process.env.AUTH0_BASE_URL || 'http://localhost:3000'}/api/auth/callback`)
+  const baseUrl = (process.env.AUTH0_BASE_URL || 'http://localhost:3000').replace(/\/$/, '') // Remove trailing slash
+  const redirectUri = encodeURIComponent(`${baseUrl}/api/auth/callback`)
   const scope = encodeURIComponent('openid profile email')
   
   let signupUrl = `https://${auth0Domain}/authorize?` + 

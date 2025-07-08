@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   
   const auth0Domain = process.env.AUTH0_ISSUER_BASE_URL || 'https://dev-4h71w2jrwhrwt542.us.auth0.com'
   const clientId = process.env.AUTH0_CLIENT_ID || 'RNYHVZ13K3G23pTmrw8c8gNclcVnyYx1'
-  const baseUrl = process.env.AUTH0_BASE_URL || 'http://localhost:3000'
+  const baseUrl = (process.env.AUTH0_BASE_URL || 'http://localhost:3000').replace(/\/$/, '') // Remove trailing slash
   
   switch (action) {
     case 'login':
