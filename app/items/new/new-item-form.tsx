@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { createItem } from "@/lib/actions/items"
+import { createItem } from "@/lib/actions/items-auth0-simple"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -118,7 +118,7 @@ export function NewItemForm({ rooms }: { rooms: Room[] }) {
         }
       }
 
-      // Call the server action
+      // Call the server action (authentication handled internally)
       const result = await createItem(formDataObj)
 
       if (result.success && result.id) {

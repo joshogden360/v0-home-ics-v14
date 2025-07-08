@@ -1,9 +1,11 @@
 import { getRooms } from "@/lib/actions/rooms"
 import { NewItemForm } from "./new-item-form"
+import { getSession } from "@/lib/session"
+import { redirect } from "next/navigation"
 
 export default async function NewItemPage() {
   // Fetch rooms for the form with error handling
-  let rooms = []
+  let rooms: any[] = []
   try {
     rooms = await getRooms()
   } catch (error) {

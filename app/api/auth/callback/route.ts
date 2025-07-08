@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { redirect } from 'next/navigation'
 import { sql } from '@/lib/db'
+import { createSession } from '@/lib/session'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     // Create or update user in database
     try {
-      await sql`
+      const result = await sql`
         INSERT INTO users (auth0_id, email, full_name, avatar_url, last_login)
         VALUES (${userInfo.sub}, ${userInfo.email}, ${userInfo.name || null}, ${userInfo.picture || null}, NOW())
         ON CONFLICT (auth0_id) DO UPDATE SET
@@ -73,16 +74,28 @@ export async function GET(request: NextRequest) {
           avatar_url = EXCLUDED.avatar_url,
           last_login = NOW(),
           updated_at = NOW()
+        RETURNING user_id, auth0_id, email, full_name, avatar_url
       `
       
+      const user = result[0]
       console.log('✅ User synced with database:', userInfo.email)
+
+      // Create session for the authenticated user
+      await createSession({
+        userId: user.user_id,
+        auth0Id: user.auth0_id,
+        email: user.email,
+        name: user.full_name || userInfo.name || 'Unknown User',
+        picture: user.avatar_url || userInfo.picture
+      })
+
+      console.log('✅ Session created for user:', user.email)
     } catch (dbError) {
       console.error('❌ Failed to sync user with database:', dbError)
-      // Don't fail the login process, just log the error
+      return redirect('/login?error=user_sync_failed')
     }
 
-    // For now, redirect to dashboard with success
-    // In a real app, you'd set proper session cookies here
+    // Redirect to dashboard with success
     return redirect('/?login=success')
 
   } catch (error) {

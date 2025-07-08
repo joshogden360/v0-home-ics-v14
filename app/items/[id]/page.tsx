@@ -1,6 +1,7 @@
-import { getItemById, deleteItem } from "@/lib/actions/items"
+import { getItemById, deleteItem } from "@/lib/actions/items-auth0"
 import { getItemMedia } from "@/lib/actions/media"
 import { getTags } from "@/lib/actions/tags"
+import { getSession } from "@/lib/session"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatDate, formatCurrency } from "@/lib/utils"
@@ -14,8 +15,15 @@ export default async function ItemDetailPage({
 }: {
   params: { id: string }
 }) {
+  // Get current user session
+  const session = await getSession()
+  
+  if (!session?.auth0Id) {
+    redirect('/login')
+  }
+
   const itemId = Number.parseInt(params.id)
-  const item = await getItemById(itemId)
+  const item = await getItemById(itemId, session.auth0Id)
   const media = await getItemMedia(itemId)
   const allTags = await getTags()
 
@@ -26,7 +34,12 @@ export default async function ItemDetailPage({
   async function handleDeleteItem() {
     "use server"
 
-    const result = await deleteItem(itemId)
+    const session = await getSession()
+    if (!session?.auth0Id) {
+      redirect('/login')
+    }
+
+    const result = await deleteItem(itemId, session.auth0Id)
 
     if (result.success) {
       redirect("/items")

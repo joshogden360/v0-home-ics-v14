@@ -1,4 +1,4 @@
-import { getDashboardStats } from "@/lib/actions/dashboard"
+import { getDashboardStats } from "@/lib/actions/dashboard-secure"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, DoorOpen, Image, AlertTriangle } from "lucide-react"
 import Link from "next/link"

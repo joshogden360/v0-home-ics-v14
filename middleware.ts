@@ -1,30 +1,43 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { verifySession } from "@/lib/session"
 
 export async function middleware(request: NextRequest) {
-  // Temporarily bypass all middleware for Auth0 testing
-  return NextResponse.next()
-  
-  // Development bypass - remove this in production
-  if (process.env.NODE_ENV === 'development') {
-    // Allow access to all pages in development
+  // Skip middleware for API routes (except /api/auth routes that need protection)
+  if (request.nextUrl.pathname.startsWith('/api/') && 
+      !request.nextUrl.pathname.startsWith('/api/auth/')) {
     return NextResponse.next()
   }
-  
-  const cookieStore = await cookies()
-  const sessionToken = cookieStore.get("session_token")?.value
+
+  // Skip middleware for static files
+  if (request.nextUrl.pathname.startsWith('/_next/') ||
+      request.nextUrl.pathname.includes('.')) {
+    return NextResponse.next()
+  }
+
+  const sessionToken = request.cookies.get("session_token")?.value
+  const session = sessionToken ? await verifySession(sessionToken) : null
 
   const isAuthPage =
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup")
 
-  if (!sessionToken && !isAuthPage) {
-    // Redirect to login if not authenticated and not on an auth page
+  // Protected routes that require authentication
+  const isProtectedRoute = 
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/items") ||
+    request.nextUrl.pathname.startsWith("/rooms") ||
+    request.nextUrl.pathname.startsWith("/maintenance") ||
+    request.nextUrl.pathname.startsWith("/documentation") ||
+    request.nextUrl.pathname.startsWith("/tags") ||
+    request.nextUrl.pathname.startsWith("/settings")
+
+  // If user is not authenticated and trying to access protected route
+  if (!session && isProtectedRoute) {
     return NextResponse.redirect(new URL("/login", request.url))
   }
 
-  if (sessionToken && isAuthPage) {
-    // Redirect to dashboard if authenticated and on an auth page
+  // If user is authenticated and trying to access auth pages, redirect to dashboard
+  if (session && isAuthPage) {
     return NextResponse.redirect(new URL("/", request.url))
   }
 
