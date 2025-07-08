@@ -176,6 +176,93 @@ export async function createItem(formData: FormData) {
   }
 }
 
+export async function updateItem(id: number, formData: FormData) {
+  try {
+    const userId = await getAuthenticatedUserId()
+    
+    // Extract form data
+    const name = formData.get("name") as string
+    if (!name || name.trim() === "") {
+      return { success: false, error: "Item name is required" }
+    }
+
+    const data = Object.fromEntries(formData.entries()) as any
+
+    // Update the item only if it belongs to user
+    const result = await sql`
+      UPDATE items SET
+        name = ${name},
+        description = ${data.description || null},
+        category = ${data.category || null},
+        purchase_date = ${data.purchase_date || null},
+        purchase_price = ${data.purchase_price ? Number.parseFloat(data.purchase_price) : null},
+        condition = ${data.condition || null},
+        notes = ${data.notes || null},
+        purchased_from = ${data.purchased_from || null},
+        serial_number = ${data.serial_number || null},
+        warranty_provider = ${data.warranty_provider || null},
+        warranty_expiration = ${data.warranty_expiration || null},
+        storage_location = ${data.storage_location || null},
+        current_value = ${data.current_value ? Number.parseFloat(data.current_value) : null},
+        depreciation_rate = ${data.depreciation_rate ? Number.parseInt(data.depreciation_rate) : null},
+        has_insurance = ${data.has_insurance === "true" ? true : false},
+        insurance_provider = ${data.insurance_provider || null},
+        insurance_policy = ${data.insurance_policy || null},
+        insurance_coverage = ${data.insurance_coverage ? Number.parseFloat(data.insurance_coverage) : null},
+        insurance_category = ${data.insurance_category || null},
+        needs_maintenance = ${data.needs_maintenance === "true" ? true : false},
+        maintenance_interval = ${data.maintenance_interval ? Number.parseInt(data.maintenance_interval) : null},
+        maintenance_instructions = ${data.maintenance_instructions || null},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE item_id = ${id} AND user_id = ${userId}
+      RETURNING item_id
+    `
+
+    if (result.length === 0) {
+      return { success: false, error: "Item not found or access denied" }
+    }
+
+    // Handle room assignment via locations table
+    if (data.room_id && data.room_id !== "none") {
+      const roomId = Number.parseInt(data.room_id)
+      
+      // Check if location already exists
+      const existingLocation = await sql`
+        SELECT location_id FROM locations WHERE item_id = ${id}
+      `
+
+      if (existingLocation.length > 0) {
+        // Update existing location
+        await sql`
+          UPDATE locations SET
+            room_id = ${roomId},
+            notes = 'Updated location',
+            updated_at = CURRENT_TIMESTAMP
+          WHERE item_id = ${id}
+        `
+      } else {
+        // Create new location
+        await sql`
+          INSERT INTO locations (item_id, room_id, notes)
+          VALUES (${id}, ${roomId}, 'Updated placement')
+        `
+      }
+    } else {
+      // Remove location if "none" selected
+      await sql`
+        DELETE FROM locations WHERE item_id = ${id}
+      `
+    }
+
+    revalidatePath(`/items/${id}`)
+    revalidatePath("/items")
+    return { success: true, id }
+  } catch (error) {
+    console.error("Error updating item:", error)
+    return { success: false, error: "Failed to update item: " + (error instanceof Error ? error.message : String(error)) }
+  }
+}
+
 export async function deleteItem(id: number) {
   try {
     const userId = await getAuthenticatedUserId()

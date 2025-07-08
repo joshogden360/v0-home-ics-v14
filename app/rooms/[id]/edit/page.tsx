@@ -1,5 +1,5 @@
-import { getRoomById, getRoomItems, getRoomMedia, getRoomDocuments } from "@/lib/actions/rooms"
-import { getItems } from "@/lib/actions/items"
+import { getRoomById, getRoomItems, getRoomMedia, getRoomDocuments } from "@/lib/actions/rooms-secure"
+import { getItems } from "@/lib/actions/items-auth0-simple"
 import { notFound } from "next/navigation"
 import { EditRoomForm } from "./edit-room-form"
 
@@ -15,8 +15,8 @@ export default async function EditRoomPage({
     notFound()
   }
 
-  const items = await getItems()
-  const roomItems = await getRoomItems(roomId)
+  const items = await getItems() as any[]
+  const roomItems = await getRoomItems(roomId) as any[]
   const roomMedia = await getRoomMedia(roomId)
   const roomDocuments = await getRoomDocuments(roomId)
 

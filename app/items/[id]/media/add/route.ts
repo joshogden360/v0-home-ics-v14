@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   // Redirect to the new path
-  return redirect(`/items/${params.id}/add-media`)
+  const { id } = await params
+  return redirect(`/items/${id}/add-media`)
 }

@@ -203,7 +203,7 @@ export function MediaUploadForm({ itemId, itemName }: { itemId: number; itemName
             Cancel
           </Button>
           <Button type="submit" disabled={isUploading || !file}>
-            {isUploading ? `Uploading (${uploadProgress}%)...` : "Upload to Vercel Blob"}
+            {isUploading ? `Uploading (${uploadProgress}%)...` : "Upload File"}
           </Button>
         </CardFooter>
       </Card>

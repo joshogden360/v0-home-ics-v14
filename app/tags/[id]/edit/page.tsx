@@ -1,13 +1,15 @@
-import { getTagById } from "@/lib/actions/tags"
+import { getTagById } from "@/lib/actions/tags-secure"
 import { EditTagForm } from "./edit-tag-form"
 import { notFound } from "next/navigation"
+import type { Tag } from "@/lib/types"
 
 export default async function EditTagPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const tagId = Number.parseInt(params.id)
+  const { id } = await params
+  const tagId = Number.parseInt(id)
   const tag = await getTagById(tagId)
 
   if (!tag) {
@@ -21,7 +23,7 @@ export default async function EditTagPage({
         <p className="text-muted-foreground">Update tag details</p>
       </div>
 
-      <EditTagForm tag={tag} />
+      <EditTagForm tag={tag as Tag} />
     </div>
   )
 }
