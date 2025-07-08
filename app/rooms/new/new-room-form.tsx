@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
-import { createRoom } from "@/lib/actions/rooms"
+import { createRoom } from "@/lib/actions/rooms-secure"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +33,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { getItems } from "@/lib/actions/items"
+import { getItems } from "@/lib/actions/items-auth0-simple"
 import { useEffect } from "react"
 import type { Item } from "@/lib/types"
 
@@ -42,6 +42,31 @@ export function NewRoomForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("basic")
+  
+  // Form data state
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    floor_number: "1",
+    area_sqft: "",
+    room_type: "",
+    has_closet: false,
+    wall_color: "",
+    wall_color_hex: "",
+    flooring_type: "",
+    window_count: "0",
+    window_width: "",
+    window_height: "",
+    ceiling_lights: "",
+    wall_lights: "",
+    identifying_features: "",
+    cleaning_frequency: "30",
+    painting_needed: "",
+    air_filter_location: "",
+    maintenance_notes: "",
+  })
+  
+  // Media and other state
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([])
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
   const [selectedDocuments, setSelectedDocuments] = useState<File[]>([])
@@ -60,7 +85,7 @@ export function NewRoomForm() {
     async function fetchItems() {
       try {
         const fetchedItems = await getItems()
-        setItems(fetchedItems)
+        setItems(fetchedItems as Item[])
       } catch (error) {
         console.error("Error fetching items:", error)
       }
@@ -69,26 +94,38 @@ export function NewRoomForm() {
     fetchItems()
   }, [])
 
-  async function handleSubmit(formData: FormData) {
+  // Handle form field changes
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  async function handleSubmit(e?: React.FormEvent) {
+    if (e) {
+      e.preventDefault()
+    }
     setIsSubmitting(true)
     setError(null)
 
     try {
       // Check if name field exists and is not empty
-      const name = formData.get("name") as string
-      if (!name || name.trim() === "") {
+      if (!formData.name || formData.name.trim() === "") {
         setError("Room name is required")
         setIsSubmitting(false)
         return
       }
 
-      // Create a new FormData object to ensure we don't lose any fields
+      // Create a FormData object from state
       const enhancedFormData = new FormData()
 
-      // First, copy all original form fields
-      for (const [key, value] of formData.entries()) {
-        enhancedFormData.append(key, value)
-      }
+      // Add all form fields from state
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) {
+          enhancedFormData.append(key, value.toString())
+        }
+      })
 
       // Add the photos to the form data
       selectedPhotos.forEach((photo, index) => {
@@ -239,7 +276,7 @@ export function NewRoomForm() {
   }
 
   return (
-    <form action={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -269,22 +306,46 @@ export function NewRoomForm() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name *</Label>
-                  <Input id="name" name="name" required aria-required="true" />
+                  <Input 
+                    id="name" 
+                    name="name" 
+                    required 
+                    aria-required="true" 
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="floor_number">Floor Number</Label>
-                  <Input id="floor_number" name="floor_number" type="number" defaultValue="1" />
+                  <Input 
+                    id="floor_number" 
+                    name="floor_number" 
+                    type="number" 
+                    value={formData.floor_number}
+                    onChange={(e) => handleInputChange("floor_number", e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="area_sqft">Area (sq ft)</Label>
-                  <Input id="area_sqft" name="area_sqft" type="number" step="0.01" />
+                  <Input 
+                    id="area_sqft" 
+                    name="area_sqft" 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.area_sqft}
+                    onChange={(e) => handleInputChange("area_sqft", e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="room_type">Room Type</Label>
-                  <Select name="room_type">
+                  <Select 
+                    name="room_type" 
+                    value={formData.room_type} 
+                    onValueChange={(value) => handleInputChange("room_type", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select room type" />
                     </SelectTrigger>
@@ -306,16 +367,28 @@ export function NewRoomForm() {
 
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
-                <Textarea id="description" name="description" rows={4} placeholder="Describe the room..." />
+                <Textarea 
+                  id="description" 
+                  name="description" 
+                  rows={4} 
+                  placeholder="Describe the room..." 
+                  value={formData.description}
+                  onChange={(e) => handleInputChange("description", e.target.value)}
+                />
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button type="button" variant="outline" disabled>
                 Back
               </Button>
-              <Button type="button" onClick={nextTab}>
-                Next
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Room"}
+                </Button>
+                <Button type="button" onClick={nextTab}>
+                  Next
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -443,9 +516,14 @@ export function NewRoomForm() {
               <Button type="button" variant="outline" onClick={prevTab}>
                 Back
               </Button>
-              <Button type="button" onClick={nextTab}>
-                Next
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Room"}
+                </Button>
+                <Button type="button" onClick={nextTab}>
+                  Next
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -542,9 +620,14 @@ export function NewRoomForm() {
               <Button type="button" variant="outline" onClick={prevTab}>
                 Back
               </Button>
-              <Button type="button" onClick={nextTab}>
-                Next
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Room"}
+                </Button>
+                <Button type="button" onClick={nextTab}>
+                  Next
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -561,20 +644,31 @@ export function NewRoomForm() {
                 <div className="space-y-2">
                   <Label htmlFor="wall_color">Wall Color</Label>
                   <div className="flex gap-2">
-                    <Input id="wall_color" name="wall_color" placeholder="e.g., Eggshell White" />
+                    <Input 
+                      id="wall_color" 
+                      name="wall_color" 
+                      placeholder="e.g., Eggshell White" 
+                      value={formData.wall_color}
+                      onChange={(e) => handleInputChange("wall_color", e.target.value)}
+                    />
                     <Input
                       type="color"
                       id="wall_color_hex"
                       name="wall_color_hex"
                       className="w-12 h-10 p-1"
-                      defaultValue="#ffffff"
+                      value={formData.wall_color_hex || "#ffffff"}
+                      onChange={(e) => handleInputChange("wall_color_hex", e.target.value)}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="flooring_type">Flooring Type</Label>
-                  <Select name="flooring_type">
+                  <Select 
+                    name="flooring_type" 
+                    value={formData.flooring_type} 
+                    onValueChange={(value) => handleInputChange("flooring_type", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select flooring type" />
                     </SelectTrigger>
@@ -658,9 +752,14 @@ export function NewRoomForm() {
               <Button type="button" variant="outline" onClick={prevTab}>
                 Back
               </Button>
-              <Button type="button" onClick={nextTab}>
-                Next
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Room"}
+                </Button>
+                <Button type="button" onClick={nextTab}>
+                  Next
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -782,9 +881,14 @@ export function NewRoomForm() {
               <Button type="button" variant="outline" onClick={prevTab}>
                 Back
               </Button>
-              <Button type="button" onClick={nextTab}>
-                Next
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Room"}
+                </Button>
+                <Button type="button" onClick={nextTab}>
+                  Next
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -820,7 +924,11 @@ export function NewRoomForm() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="painting_needed">Painting Needed</Label>
-                  <Select name="painting_needed">
+                  <Select 
+                    name="painting_needed" 
+                    value={formData.painting_needed} 
+                    onValueChange={(value) => handleInputChange("painting_needed", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select option" />
                     </SelectTrigger>
@@ -834,7 +942,13 @@ export function NewRoomForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="cleaning_frequency">Cleaning Frequency (days)</Label>
-                  <Input id="cleaning_frequency" name="cleaning_frequency" type="number" defaultValue="30" />
+                  <Input 
+                    id="cleaning_frequency" 
+                    name="cleaning_frequency" 
+                    type="number" 
+                    value={formData.cleaning_frequency}
+                    onChange={(e) => handleInputChange("cleaning_frequency", e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -844,6 +958,8 @@ export function NewRoomForm() {
                   id="air_filter_location"
                   name="air_filter_location"
                   placeholder="e.g., North wall near ceiling"
+                  value={formData.air_filter_location}
+                  onChange={(e) => handleInputChange("air_filter_location", e.target.value)}
                 />
               </div>
 
@@ -854,6 +970,8 @@ export function NewRoomForm() {
                   name="maintenance_notes"
                   rows={3}
                   placeholder="Add any special maintenance instructions for this room..."
+                  value={formData.maintenance_notes}
+                  onChange={(e) => handleInputChange("maintenance_notes", e.target.value)}
                 />
               </div>
 

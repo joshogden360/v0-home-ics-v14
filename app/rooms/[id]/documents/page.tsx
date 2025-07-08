@@ -1,4 +1,4 @@
-import { getRoomById } from "@/lib/actions/rooms"
+import { getRoomById } from "@/lib/actions/rooms-secure"
 import { getDocumentsByRelation } from "@/lib/actions/documents"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"

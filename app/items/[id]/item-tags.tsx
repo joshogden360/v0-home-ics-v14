@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { addTagToItem, removeTagFromItem } from "@/lib/actions/tags"
+import { addTagToItem, removeTagFromItem } from "@/lib/actions/tags-secure"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"

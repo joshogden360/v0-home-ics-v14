@@ -1,20 +1,18 @@
-import { getRoomById, getRoomItems, deleteRoom } from "@/lib/actions/rooms"
+import { getRoomById, getRoomItems, deleteRoom } from "@/lib/actions/rooms-secure"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { Pencil, Trash2, ArrowLeft, Package } from "lucide-react"
-import { DataTable } from "@/components/ui/data-table"
-import type { ColumnDef } from "@tanstack/react-table"
-import type { Item } from "@/lib/types"
-import { formatDate, formatCurrency } from "@/lib/utils"
+import { RoomItemsTable } from "./room-items-table"
 
 export default async function RoomDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const roomId = Number.parseInt(params.id)
+  const { id } = await params
+  const roomId = Number.parseInt(id)
   const room = await getRoomById(roomId)
 
   if (!room) {
@@ -33,42 +31,7 @@ export default async function RoomDetailPage({
     }
   }
 
-  const columns: ColumnDef<Item>[] = [
-    {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => (
-        <Link href={`/items/${row.original.item_id}`} className="font-medium hover:underline">
-          {row.original.name}
-        </Link>
-      ),
-    },
-    {
-      accessorKey: "category",
-      header: "Category",
-      cell: ({ row }) => row.original.category || "Uncategorized",
-    },
-    {
-      accessorKey: "purchase_date",
-      header: "Purchase Date",
-      cell: ({ row }) => formatDate(row.original.purchase_date),
-    },
-    {
-      accessorKey: "purchase_price",
-      header: "Price",
-      cell: ({ row }) => formatCurrency(row.original.purchase_price),
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <Link href={`/items/${row.original.item_id}`}>
-          <Button variant="ghost" size="sm">
-            View
-          </Button>
-        </Link>
-      ),
-    },
-  ]
+
 
   return (
     <div className="space-y-6">
@@ -144,7 +107,7 @@ export default async function RoomDetailPage({
           <CardDescription>Inventory items located in {room.name}</CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={items} searchKey="name" />
+          <RoomItemsTable items={items as any[]} />
         </CardContent>
       </Card>
     </div>

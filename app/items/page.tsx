@@ -1,4 +1,4 @@
-import { getItems } from "@/lib/actions/items"
+import { getItems } from "@/lib/actions/items-auth0-simple"
 import { Button } from "@/components/ui/button"
 import { formatDate, formatCurrency } from "@/lib/utils"
 import Link from "next/link"
@@ -6,7 +6,7 @@ import { Plus } from "lucide-react"
 import ItemsTable from "./items-table"
 
 export default async function ItemsPage() {
-  // Fetch items data
+  // Fetch items data (authentication handled internally)
   const items = await getItems()
 
   // Prepare the data for the client component

@@ -1,10 +1,11 @@
-import { getItemById } from "@/lib/actions/items"
-import { getRooms } from "@/lib/actions/rooms"
+import { getItemById } from "@/lib/actions/items-auth0-simple"
+import { getRooms } from "@/lib/actions/rooms-secure"
 import EditItemForm from "./edit-item-form"
 import { notFound } from "next/navigation"
 
-export default async function EditItemPage({ params }: { params: { id: string } }) {
-  const itemId = Number.parseInt(params.id, 10)
+export default async function EditItemPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const itemId = Number.parseInt(id, 10)
   const item = await getItemById(itemId)
   const rooms = await getRooms()
 

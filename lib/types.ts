@@ -39,10 +39,27 @@ export interface Item {
 
 export interface Room {
   room_id: number
+  user_id: number
   name: string
   description: string | null
   floor_number: number
   area_sqft: number | null
+  room_type?: string | null
+  has_closet?: boolean
+  wall_color?: string | null
+  wall_color_hex?: string | null
+  flooring_type?: string | null
+  window_count?: number
+  window_width?: number | null
+  window_height?: number | null
+  ceiling_lights?: string | null
+  wall_lights?: string | null
+  identifying_features?: string | null
+  last_cleaned?: string | null
+  cleaning_frequency?: number | null
+  painting_needed?: string | null
+  air_filter_location?: string | null
+  maintenance_notes?: string | null
   created_at: string
 }
 

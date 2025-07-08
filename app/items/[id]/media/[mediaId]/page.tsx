@@ -1,4 +1,4 @@
-import { getItemById } from "@/lib/actions/items"
+import { getItemById } from "@/lib/actions/items-auth0-simple"
 import { deleteMedia } from "@/lib/actions/media"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,10 +11,11 @@ import { sql } from "@/lib/db"
 export default async function MediaDetailPage({
   params,
 }: {
-  params: { id: string; mediaId: string }
+  params: Promise<{ id: string; mediaId: string }>
 }) {
-  const itemId = Number.parseInt(params.id)
-  const mediaId = Number.parseInt(params.mediaId)
+  const { id, mediaId: mediaIdParam } = await params
+  const itemId = Number.parseInt(id)
+  const mediaId = Number.parseInt(mediaIdParam)
 
   const item = await getItemById(itemId)
   if (!item) {
@@ -48,7 +49,7 @@ export default async function MediaDetailPage({
 
   // Function to check if a URL is a Vercel Blob URL
   function isBlobUrl(url: string) {
-    return url && url.includes("vercel-blob.com")
+    return url && url.includes("vercel-storage.com")
   }
 
   // Parse metadata if it's a string
@@ -100,10 +101,6 @@ export default async function MediaDetailPage({
                   src={media.file_path || "/placeholder.svg"}
                   alt={media.file_name}
                   className="max-w-full max-h-[70vh] object-contain"
-                  onError={(e) => {
-                    console.error("Image failed to load:", media.file_path)
-                    e.currentTarget.src = "/abstract-colorful-flow.png"
-                  }}
                 />
               </div>
             ) : isPDF && isBlobUrl(media.file_path) ? (
@@ -113,34 +110,12 @@ export default async function MediaDetailPage({
                 controls
                 className="max-w-full max-h-[70vh]"
                 src={media.file_path}
-                onError={(e) => {
-                  console.error("Video failed to load:", media.file_path)
-                  e.currentTarget.style.display = "none"
-                  const parent = e.currentTarget.parentElement
-                  if (parent) {
-                    const errorMsg = document.createElement("div")
-                    errorMsg.className = "p-4 text-center"
-                    errorMsg.textContent = "Video format not supported or file not found"
-                    parent.appendChild(errorMsg)
-                  }
-                }}
               />
             ) : isAudio && isBlobUrl(media.file_path) ? (
               <audio
                 controls
                 className="w-full"
                 src={media.file_path}
-                onError={(e) => {
-                  console.error("Audio failed to load:", media.file_path)
-                  e.currentTarget.style.display = "none"
-                  const parent = e.currentTarget.parentElement
-                  if (parent) {
-                    const errorMsg = document.createElement("div")
-                    errorMsg.className = "p-4 text-center"
-                    errorMsg.textContent = "Audio format not supported or file not found"
-                    parent.appendChild(errorMsg)
-                  }
-                }}
               />
             ) : (
               <div className="overflow-hidden rounded-md max-h-[70vh] flex items-center justify-center bg-muted p-8">

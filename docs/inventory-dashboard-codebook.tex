@@ -1,0 +1,323 @@
+\documentclass[11pt,twoside,openright]{book}
+
+% Essential packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{courier}
+\usepackage{hyperref}
+\usepackage{bookmark}
+
+% Page setup for letter size, duplex printing
+\geometry{
+    letterpaper,
+    inner=1in,
+    outer=0.75in,
+    top=1in,
+    bottom=1in,
+    headheight=14pt
+}
+
+% Define colors for syntax highlighting
+\definecolor{codebackground}{RGB}{248, 248, 248}
+\definecolor{commentcolor}{RGB}{0, 128, 0}
+\definecolor{keywordcolor}{RGB}{0, 0, 255}
+\definecolor{stringcolor}{RGB}{163, 21, 21}
+
+% Configure code listings
+\lstset{
+    backgroundcolor=\color{codebackground},
+    commentstyle=\color{commentcolor},
+    keywordstyle=\color{keywordcolor},
+    stringstyle=\color{stringcolor},
+    basicstyle=\footnotesize\ttfamily,
+    breaklines=true,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    frameround=tttt,
+    framesep=5pt,
+    xleftmargin=10pt,
+    xrightmargin=10pt,
+    tabsize=2,
+    showstringspaces=false
+}
+
+% TypeScript language definition
+\lstdefinelanguage{typescript}{
+    keywords={abstract,any,as,break,case,catch,class,const,continue,declare,default,delete,do,else,enum,export,extends,false,finally,for,from,function,get,if,implements,import,in,instanceof,interface,let,module,namespace,new,null,number,object,package,private,protected,public,readonly,return,set,static,string,super,switch,this,throw,true,try,type,typeof,undefined,var,void,while,with,yield},
+    keywordstyle=\color{keywordcolor},
+    comment=[l]{//},
+    morecomment=[s]{/*}{*/},
+    morestring=[b]',
+    morestring=[b]"
+}
+
+% Headers and footers
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\leftmark}
+\fancyhead[RO]{\rightmark}
+\fancyfoot[LE,RO]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Title page
+\title{\Huge\textbf{Inventory Dashboard}\\
+\Large Complete Codebase Reference\\
+\vspace{1cm}
+\large Next.js 15 + TypeScript + Jotai + AI}
+\author{Generated from Source Code}
+\date{July 06, 2025}
+
+% Custom commands
+\newcommand{\filepath}[1]{\texttt{#1}}
+\newcommand{\codesection}[3]{
+    \section{#1}
+    \textbf{Location:} \filepath{#2}\\
+    \textbf{Description:} #3\\
+}
+
+\begin{document}
+
+% Title page
+\maketitle
+\thispagestyle{empty}
+
+% Table of contents
+\cleardoublepage
+\tableofcontents
+
+% Architecture overview
+\cleardoublepage
+\chapter{Project Architecture}
+
+This document contains the complete source code for the Inventory Dashboard application, a comprehensive Next.js-based inventory management system with AI-powered analysis capabilities.
+
+\section{Technology Stack}
+\begin{itemize}
+    \item \textbf{Framework:} Next.js 15.2.4 with App Router
+    \item \textbf{Language:} TypeScript 5+
+    \item \textbf{UI Library:} React 19
+    \item \textbf{State Management:} Jotai (atomic state management)
+    \item \textbf{Styling:} Tailwind CSS + shadcn/ui components
+    \item \textbf{Database:} PostgreSQL via Neon Serverless
+    \item \textbf{AI Integration:} Google Gemini 1.5 Flash
+\end{itemize}
+
+
+\cleardoublepage
+\chapter{Project Foundation}
+
+Core foundational files that define the overall structure
+
+
+\codesection{layout.tsx}{app/layout.tsx}{Root layout with theme provider and navigation}
+
+\lstinputlisting[language=typescript,caption={layout.tsx}]{app/layout.tsx}
+
+\clearpage
+
+
+\codesection{globals.css}{app/globals.css}{Global styles and CSS custom properties}
+
+\lstinputlisting[language=css,caption={globals.css}]{app/globals.css}
+
+\clearpage
+
+
+\codesection{middleware.ts}{middleware.ts}{Next.js middleware for authentication & routing}
+
+\lstinputlisting[language=typescript,caption={middleware.ts}]{middleware.ts}
+
+\clearpage
+
+
+\cleardoublepage
+\chapter{Configuration Files}
+
+Build, compilation, and deployment configuration
+
+
+\codesection{package.json}{package.json}{Project dependencies, scripts, and metadata}
+
+\lstinputlisting[language=json,caption={package.json}]{package.json}
+
+\clearpage
+
+
+\codesection{tsconfig.json}{tsconfig.json}{TypeScript compiler configuration}
+
+\lstinputlisting[language=json,caption={tsconfig.json}]{tsconfig.json}
+
+\clearpage
+
+
+\codesection{next.config.mjs}{next.config.mjs}{Next.js build and runtime configuration}
+
+\lstinputlisting[language=javascript,caption={next.config.mjs}]{next.config.mjs}
+
+\clearpage
+
+
+\cleardoublepage
+\chapter{Core Application Pages}
+
+Main pages that users interact with
+
+
+\codesection{page.tsx}{app/page.tsx}{Dashboard homepage with stats and quick actions}
+
+\lstinputlisting[language=typescript,caption={page.tsx}]{app/page.tsx}
+
+\clearpage
+
+
+\codesection{main-nav.tsx}{app/main-nav.tsx}{Main navigation component with route definitions}
+
+\lstinputlisting[language=typescript,caption={main-nav.tsx}]{app/main-nav.tsx}
+
+\clearpage
+
+
+\cleardoublepage
+\chapter{UI Component Library}
+
+Reusable UI components built on Radix UI and Tailwind CSS
+
+
+\codesection{button.tsx}{components/ui/button.tsx}{Base button component with variants}
+
+\lstinputlisting[language=typescript,caption={button.tsx}]{components/ui/button.tsx}
+
+\clearpage
+
+
+\codesection{input.tsx}{components/ui/input.tsx}{Form input component with validation}
+
+\lstinputlisting[language=typescript,caption={input.tsx}]{components/ui/input.tsx}
+
+\clearpage
+
+
+\codesection{card.tsx}{components/ui/card.tsx}{Container card component for content sections}
+
+\lstinputlisting[language=typescript,caption={card.tsx}]{components/ui/card.tsx}
+
+\clearpage
+
+
+\codesection{form.tsx}{components/ui/form.tsx}{Form handling with React Hook Form integration}
+
+\lstinputlisting[language=typescript,caption={form.tsx}]{components/ui/form.tsx}
+
+\clearpage
+
+
+\codesection{table.tsx}{components/ui/table.tsx}{Data table components for displaying lists}
+
+\lstinputlisting[language=typescript,caption={table.tsx}]{components/ui/table.tsx}
+
+\clearpage
+
+
+\cleardoublepage
+\chapter{Business Logic \& Server Actions}
+
+Server-side business logic implemented as Next.js Server Actions
+
+
+\codesection{items.ts}{lib/actions/items.ts}{Item CRUD operations, search, and filtering}
+
+\lstinputlisting[language=typescript,caption={items.ts}]{lib/actions/items.ts}
+
+\clearpage
+
+
+\codesection{rooms.ts}{lib/actions/rooms.ts}{Room management and location tracking}
+
+\lstinputlisting[language=typescript,caption={rooms.ts}]{lib/actions/rooms.ts}
+
+\clearpage
+
+
+\codesection{dashboard.ts}{lib/actions/dashboard.ts}{Dashboard statistics and data aggregation}
+
+\lstinputlisting[language=typescript,caption={dashboard.ts}]{lib/actions/dashboard.ts}
+
+\clearpage
+
+
+\cleardoublepage
+\chapter{State Management (Jotai)}
+
+Jotai atoms for atomic state management
+
+
+\codesection{atoms.ts}{lib/atoms/atoms.ts}{Main UI atoms (sidebar, theme, search, filters)}
+
+\lstinputlisting[language=typescript,caption={atoms.ts}]{lib/atoms/atoms.ts}
+
+\clearpage
+
+
+\codesection{ai.ts}{lib/atoms/ai.ts}{AI analysis state (image processing, results)}
+
+\lstinputlisting[language=typescript,caption={ai.ts}]{lib/atoms/ai.ts}
+
+\clearpage
+
+
+\cleardoublepage
+\chapter{Core Utilities \& Types}
+
+Fundamental utilities, type definitions, and database logic
+
+
+\codesection{types.ts}{lib/types.ts}{TypeScript interfaces for Item, Room, Maintenance, etc.}
+
+\lstinputlisting[language=typescript,caption={types.ts}]{lib/types.ts}
+
+\clearpage
+
+
+\codesection{utils.ts}{lib/utils.ts}{Utility functions (className merging, formatting)}
+
+\lstinputlisting[language=typescript,caption={utils.ts}]{lib/utils.ts}
+
+\clearpage
+
+
+\codesection{db.ts}{lib/db.ts}{Database connection and query helpers}
+
+\lstinputlisting[language=typescript,caption={db.ts}]{lib/db.ts}
+
+\clearpage
+
+
+\appendix
+
+\chapter{Quick Reference}
+
+\section{Finding Code by Feature}
+\begin{itemize}
+    \item \textbf{User Interface} → \filepath{components/ui/}
+    \item \textbf{Data Operations} → \filepath{lib/actions/}
+    \item \textbf{State Management} → \filepath{lib/atoms/}
+    \item \textbf{Type Definitions} → \filepath{lib/types.ts}
+    \item \textbf{Database} → \filepath{lib/db.ts}
+\end{itemize}
+
+\section{Key Patterns}
+\begin{itemize}
+    \item \textbf{Server Actions} → \texttt{"use server"} functions
+    \item \textbf{Client Components} → \texttt{"use client"} components
+    \item \textbf{Jotai Atoms} → State definitions in \filepath{lib/atoms/}
+    \item \textbf{Type Safety} → Interface definitions in \filepath{lib/types.ts}
+\end{itemize}
+
+\end{document}

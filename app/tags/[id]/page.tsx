@@ -1,4 +1,4 @@
-import { getTagById, getTagItems, deleteTag } from "@/lib/actions/tags"
+import { getTagById, getTagItems, deleteTag } from "@/lib/actions/tags-secure"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatDate, formatCurrency } from "@/lib/utils"
@@ -12,9 +12,10 @@ import type { Item } from "@/lib/types"
 export default async function TagDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const tagId = Number.parseInt(params.id)
+  const { id } = await params
+  const tagId = Number.parseInt(id)
   const tag = await getTagById(tagId)
 
   if (!tag) {

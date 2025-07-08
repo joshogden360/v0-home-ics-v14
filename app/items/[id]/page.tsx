@@ -1,6 +1,7 @@
-import { getItemById, deleteItem } from "@/lib/actions/items"
+import { getItemById, deleteItem } from "@/lib/actions/items-auth0-simple"
 import { getItemMedia } from "@/lib/actions/media"
-import { getTags } from "@/lib/actions/tags"
+import { getTags } from "@/lib/actions/tags-secure"
+import { getSession } from "@/lib/session"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatDate, formatCurrency } from "@/lib/utils"
@@ -8,13 +9,22 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { Pencil, Trash2, ArrowLeft, Plus, FileText, Music, Video, ImageIcon } from "lucide-react"
 import { ItemTags } from "./item-tags"
+import type { Tag } from "@/lib/types"
 
 export default async function ItemDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const itemId = Number.parseInt(params.id)
+  // Get current user session
+  const session = await getSession()
+  
+  if (!session?.auth0Id) {
+    redirect('/login')
+  }
+
+  const { id } = await params
+  const itemId = Number.parseInt(id)
   const item = await getItemById(itemId)
   const media = await getItemMedia(itemId)
   const allTags = await getTags()
@@ -23,8 +33,17 @@ export default async function ItemDetailPage({
     notFound()
   }
 
+  // Type assertion to fix TypeScript issues
+  const typedItem = item as any
+  const typedTags = (allTags as any[]) as Tag[]
+
   async function handleDeleteItem() {
     "use server"
+
+    const session = await getSession()
+    if (!session?.auth0Id) {
+      redirect('/login')
+    }
 
     const result = await deleteItem(itemId)
 
@@ -42,7 +61,7 @@ export default async function ItemDetailPage({
 
   // Function to check if a URL is a Vercel Blob URL
   function isBlobUrl(url: string) {
-    return url && url.includes("vercel-blob.com")
+    return url && url.includes("vercel-storage.com")
   }
 
   return (
@@ -142,11 +161,6 @@ export default async function ItemDetailPage({
                             src={mediaItem.file_path || "/placeholder.svg"}
                             alt={mediaItem.file_name || "Item image"}
                             className="h-full w-full object-cover"
-                            onError={(e) => {
-                              console.error("Image failed to load:", mediaItem.file_path)
-                              e.currentTarget.src = "/colorful-abstract-flow.png"
-                              e.currentTarget.alt = "Image not available"
-                            }}
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center p-4 h-full w-full">
@@ -192,7 +206,7 @@ export default async function ItemDetailPage({
           </div>
         </CardHeader>
         <CardContent>
-          <ItemTags itemId={itemId} itemTags={item.tags || []} allTags={allTags} />
+          <ItemTags itemId={itemId} itemTags={(typedItem.tags || []) as Tag[]} allTags={typedTags} />
         </CardContent>
       </Card>
 

@@ -1,13 +1,16 @@
-import { getRooms } from "@/lib/actions/rooms"
+import { getRooms } from "@/lib/actions/rooms-secure"
+import type { Room } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Plus } from "lucide-react"
 import { RoomsTable } from "./rooms-table"
 
+type RoomWithCount = Room & { item_count: number }
+
 export default async function RoomsPage() {
   // Fetch rooms data on the server
-  const rooms = await getRooms()
+  const rooms = await getRooms() as RoomWithCount[]
 
   // Pre-process the data for the client component
   const processedRooms = rooms.map((room) => ({

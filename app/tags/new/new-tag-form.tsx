@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createTag } from "@/lib/actions/tags"
+import { createTag } from "@/lib/actions/tags-secure"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"

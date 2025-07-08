@@ -1,12 +1,13 @@
-import { getItemById } from "@/lib/actions/items"
+import { getItemById } from "@/lib/actions/items-auth0-simple"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MediaUploadForm } from "./media-upload-form"
 
-export default async function AddMediaPage({ params }: { params: { id: string } }) {
-  const itemId = Number.parseInt(params.id)
+export default async function AddMediaPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const itemId = Number.parseInt(id)
   const item = await getItemById(itemId)
 
   if (!item) {
@@ -23,9 +24,9 @@ export default async function AddMediaPage({ params }: { params: { id: string } 
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">Add Media</h1>
       </div>
-      <p className="text-muted-foreground">Upload images or documents for {item.name}</p>
+      <p className="text-muted-foreground">Upload images or documents for {(item as any).name}</p>
 
-      <MediaUploadForm itemId={itemId} itemName={item.name} />
+      <MediaUploadForm itemId={itemId} itemName={(item as any).name} />
     </div>
   )
 }

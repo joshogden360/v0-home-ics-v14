@@ -1,4 +1,4 @@
-import { getTags } from "@/lib/actions/tags"
+import { getTags } from "@/lib/actions/tags-secure"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"

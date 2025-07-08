@@ -3,18 +3,57 @@
 import { sql } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { put, del, list } from "@vercel/blob"
+import { getSession } from "@/lib/session"
+
+// Helper to get user database ID from Auth0 ID
+async function getUserIdFromAuth0(auth0Id: string): Promise<number | null> {
+  try {
+    const result = await sql`
+      SELECT user_id FROM users WHERE auth0_id = ${auth0Id}
+    `
+    return result[0]?.user_id || null
+  } catch (error) {
+    console.error('Error getting user ID:', error)
+    return null
+  }
+}
+
+// Helper to ensure user is authenticated and get their database ID
+async function getAuthenticatedUserId(): Promise<number> {
+  const session = await getSession()
+  if (!session?.auth0Id) {
+    throw new Error('User not authenticated')
+  }
+  
+  const userId = await getUserIdFromAuth0(session.auth0Id)
+  if (!userId) {
+    throw new Error('User not found in database')
+  }
+  
+  return userId
+}
 
 export async function uploadItemMedia(formData: FormData) {
-  const itemId = Number.parseInt(formData.get("item_id") as string)
-  const mediaType = formData.get("media_type") as string
-  const description = formData.get("description") as string
-  const file = formData.get("file") as File
-
-  if (!file || !itemId || !mediaType) {
-    return { success: false, error: "Missing required fields" }
-  }
-
   try {
+    const userId = await getAuthenticatedUserId()
+    
+    const itemId = Number.parseInt(formData.get("item_id") as string)
+    const mediaType = formData.get("media_type") as string
+    const description = formData.get("description") as string
+    const file = formData.get("file") as File
+
+    if (!file || !itemId || !mediaType) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // SECURITY: Verify item belongs to the authenticated user
+    const itemCheck = await sql`
+      SELECT item_id FROM items WHERE item_id = ${itemId} AND user_id = ${userId}
+    `
+    
+    if (itemCheck.length === 0) {
+      return { success: false, error: "Item not found or access denied" }
+    }
     // Create a unique filename
     const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "-")}`.toLowerCase()
     const folderPath = `item-${itemId}`
@@ -61,10 +100,14 @@ export async function uploadItemMedia(formData: FormData) {
 
 export async function getItemMedia(itemId: number) {
   try {
+    const userId = await getAuthenticatedUserId()
+    
+    // SECURITY: Only get media for items that belong to the authenticated user
     const media = await sql`
-      SELECT * FROM media
-      WHERE item_id = ${itemId}
-      ORDER BY created_at DESC
+      SELECT m.* FROM media m
+      JOIN items i ON m.item_id = i.item_id
+      WHERE m.item_id = ${itemId} AND i.user_id = ${userId}
+      ORDER BY m.created_at DESC
     `
 
     // Log media items for debugging
@@ -82,14 +125,17 @@ export async function getItemMedia(itemId: number) {
 
 export async function deleteMedia(mediaId: number, itemId: number) {
   try {
-    // Get the file path before deleting
+    const userId = await getAuthenticatedUserId()
+    
+    // SECURITY: Get the file path before deleting, but only if user owns the item
     const mediaResult = await sql`
-      SELECT file_path, metadata FROM media
-      WHERE media_id = ${mediaId}
+      SELECT m.file_path, m.metadata FROM media m
+      JOIN items i ON m.item_id = i.item_id
+      WHERE m.media_id = ${mediaId} AND m.item_id = ${itemId} AND i.user_id = ${userId}
     `
 
     if (mediaResult.length === 0) {
-      return { success: false, error: "Media not found" }
+      return { success: false, error: "Media not found or access denied" }
     }
 
     const media = mediaResult[0]
