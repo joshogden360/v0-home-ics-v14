@@ -26,15 +26,31 @@ export function QuickCapture({ onItemsDetected, className }: QuickCaptureProps) 
 
     try {
       const result = await aiService.analyzeImage(file)
-      onItemsDetected?.(result.items)
+      console.log('Quick capture analysis result:', result)
       
-      // Auto-clear after success
+      if (result.items && result.items.length > 0) {
+        onItemsDetected?.(result.items)
+        
+        // Auto-clear after success
+        setTimeout(() => {
+          setPreview(null)
+          URL.revokeObjectURL(url)
+        }, 2000)
+      } else {
+        console.warn('No items detected in image')
+        // Keep preview visible for longer when no items detected
+        setTimeout(() => {
+          setPreview(null)
+          URL.revokeObjectURL(url)
+        }, 4000)
+      }
+    } catch (error) {
+      console.error('Analysis failed:', error)
+      // Clear preview on error
       setTimeout(() => {
         setPreview(null)
         URL.revokeObjectURL(url)
-      }, 2000)
-    } catch (error) {
-      console.error('Analysis failed:', error)
+      }, 3000)
     } finally {
       setIsAnalyzing(false)
     }
@@ -82,7 +98,7 @@ export function QuickCapture({ onItemsDetected, className }: QuickCaptureProps) 
           )}
         </div>
         <div className="p-3 text-sm">
-          {isAnalyzing ? 'Detecting items...' : 'Items detected!'}
+          {isAnalyzing ? 'Detecting items...' : 'Analysis complete'}
         </div>
       </div>
     )

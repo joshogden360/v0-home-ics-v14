@@ -23,15 +23,23 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
   const handleQuickCapture = (items: any[]) => {
     setDetectedItems(prev => [...prev, ...items])
     // Quick save functionality
-    saveSingleItem(items[0])
+    if (items.length > 0) {
+      saveSingleItem(items[0])
+    }
   }
 
   const saveSingleItem = async (item: any) => {
     try {
+      if (!item) return
+      
+      const label = item.boundingBox?.label || item.label || 'Unknown item'
+      const category = item.category || label.split(' ')[0] || 'Uncategorized'
+      const description = item.description || `Quick capture: ${label}`
+      
       const formData = new FormData()
-      formData.append('name', item.label)
-      formData.append('description', `Quick capture: ${item.label}`)
-      formData.append('category', item.label.split(' ')[0])
+      formData.append('name', label)
+      formData.append('description', description)
+      formData.append('category', category)
       
       await createItem(formData)
     } catch (error) {
@@ -40,7 +48,7 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
   }
 
   const handleBulkComplete = (results: any[]) => {
-    const allItems = results.flatMap(r => r.items)
+    const allItems = results.flatMap(r => r.items || [])
     setDetectedItems(allItems)
     // Navigate to review page or show inline review
   }
@@ -152,12 +160,15 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
             <div className="mt-8">
               <h3 className="text-sm font-medium mb-4">Recently Added</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {detectedItems.slice(-6).map((item, i) => (
-                  <div key={i} className="border rounded-lg p-3">
-                    <div className="aspect-square bg-muted rounded mb-2" />
-                    <p className="text-sm font-medium truncate">{item.label}</p>
-                  </div>
-                ))}
+                {detectedItems.slice(-6).map((item, i) => {
+                  const label = item.boundingBox?.label || item.label || 'Unknown item'
+                  return (
+                    <div key={i} className="border rounded-lg p-3">
+                      <div className="aspect-square bg-muted rounded mb-2" />
+                      <p className="text-sm font-medium truncate">{label}</p>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
