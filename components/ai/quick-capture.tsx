@@ -6,7 +6,7 @@ import { aiService } from '@/lib/services/ai-service'
 import { cn } from '@/lib/utils'
 
 interface QuickCaptureProps {
-  onItemsDetected?: (items: any[]) => void
+  onItemsDetected?: (items: any[], originalImage?: string) => void
   className?: string
 }
 
@@ -14,11 +14,13 @@ export function QuickCapture({ onItemsDetected, className }: QuickCaptureProps) 
   const [isCapturing, setIsCapturing] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
+  const [currentFile, setCurrentFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleCapture = useCallback(async (file: File) => {
     setIsCapturing(false)
     setIsAnalyzing(true)
+    setCurrentFile(file)
     
     // Create preview
     const url = URL.createObjectURL(file)
@@ -29,11 +31,19 @@ export function QuickCapture({ onItemsDetected, className }: QuickCaptureProps) 
       console.log('Quick capture analysis result:', result)
       
       if (result.items && result.items.length > 0) {
-        onItemsDetected?.(result.items)
+        // Convert file to data URL for cropping
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            onItemsDetected?.(result.items, e.target.result as string)
+          }
+        }
+        reader.readAsDataURL(file)
         
         // Auto-clear after success
         setTimeout(() => {
           setPreview(null)
+          setCurrentFile(null)
           URL.revokeObjectURL(url)
         }, 2000)
       } else {
@@ -41,6 +51,7 @@ export function QuickCapture({ onItemsDetected, className }: QuickCaptureProps) 
         // Keep preview visible for longer when no items detected
         setTimeout(() => {
           setPreview(null)
+          setCurrentFile(null)
           URL.revokeObjectURL(url)
         }, 4000)
       }
@@ -49,6 +60,7 @@ export function QuickCapture({ onItemsDetected, className }: QuickCaptureProps) 
       // Clear preview on error
       setTimeout(() => {
         setPreview(null)
+        setCurrentFile(null)
         URL.revokeObjectURL(url)
       }, 3000)
     } finally {

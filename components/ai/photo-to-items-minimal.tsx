@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Camera, Upload, Grid3X3, Zap, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -14,22 +14,88 @@ interface PhotoToItemsMinimalProps {
   rooms?: Room[]
 }
 
+interface DetectedItemWithImage {
+  boundingBox?: {
+    x: number
+    y: number
+    width: number
+    height: number
+    label: string
+  }
+  label?: string
+  category?: string
+  description?: string
+  croppedImage?: string
+  originalImage?: string
+}
+
 export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
   const router = useRouter()
   const [mode, setMode] = useState<'quick' | 'bulk' | null>(null)
   const [currentImage, setCurrentImage] = useState<string | null>(null)
-  const [detectedItems, setDetectedItems] = useState<any[]>([])
+  const [detectedItems, setDetectedItems] = useState<DetectedItemWithImage[]>([])
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleQuickCapture = (items: any[]) => {
-    setDetectedItems(prev => [...prev, ...items])
-    // Quick save functionality
+  const handleQuickCapture = async (items: any[], originalImage?: string) => {
     if (items.length > 0) {
-      saveSingleItem(items[0])
+      // Crop the image for the detected item
+      const itemsWithImages = await Promise.all(items.map(async (item) => {
+        const croppedImage = await cropItemImage(item, originalImage)
+        return { ...item, croppedImage, originalImage }
+      }))
+      
+      setDetectedItems(prev => [...prev, ...itemsWithImages])
+      
+      // Save the first item
+      await saveSingleItem(itemsWithImages[0])
     }
   }
 
-  const saveSingleItem = async (item: any) => {
+  const cropItemImage = async (item: any, imageSrc?: string): Promise<string | undefined> => {
+    if (!imageSrc || !item.boundingBox) return undefined
+    
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(undefined)
+          return
+        }
+        
+        // Calculate crop dimensions
+        const box = item.boundingBox
+        const cropX = Math.round(box.x * img.width)
+        const cropY = Math.round(box.y * img.height)
+        const cropWidth = Math.round(box.width * img.width)
+        const cropHeight = Math.round(box.height * img.height)
+        
+        // Set canvas size to cropped dimensions
+        canvas.width = cropWidth
+        canvas.height = cropHeight
+        
+        // Draw cropped portion
+        ctx.drawImage(
+          img,
+          cropX, cropY, cropWidth, cropHeight,
+          0, 0, cropWidth, cropHeight
+        )
+        
+        // Convert to data URL
+        resolve(canvas.toDataURL('image/jpeg', 0.9))
+      }
+      
+      img.onerror = () => resolve(undefined)
+      img.src = imageSrc
+    })
+  }
+
+  const saveSingleItem = async (item: DetectedItemWithImage) => {
+    if (isSaving) return
+    
     try {
+      setIsSaving(true)
       if (!item) return
       
       const label = item.boundingBox?.label || item.label || 'Unknown item'
@@ -40,10 +106,32 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
       formData.append('name', label)
       formData.append('description', description)
       formData.append('category', category)
+      formData.append('condition', 'Unknown')
+      formData.append('notes', 'Added via quick capture')
       
-      await createItem(formData)
+      // If we have a cropped image, convert it to a file and append
+      if (item.croppedImage) {
+        const response = await fetch(item.croppedImage)
+        const blob = await response.blob()
+        const file = new File([blob], `${label.replace(/\s+/g, '-')}.jpg`, { type: 'image/jpeg' })
+        formData.append('photos', file)
+      }
+      
+      const result = await createItem(formData)
+      
+      if (result.success) {
+        console.log('Item saved successfully:', label)
+        // Navigate to the items page to see the new item
+        setTimeout(() => {
+          router.push('/items')
+        }, 1000)
+      } else {
+        console.error('Failed to save item:', result.error)
+      }
     } catch (error) {
       console.error('Failed to save item:', error)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -155,7 +243,7 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
             <p className="text-sm text-muted-foreground">Items are saved automatically</p>
           </div>
 
-          {/* Recent Items */}
+          {/* Recently Added */}
           {detectedItems.length > 0 && (
             <div className="mt-8">
               <h3 className="text-sm font-medium mb-4">Recently Added</h3>
@@ -164,7 +252,19 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
                   const label = item.boundingBox?.label || item.label || 'Unknown item'
                   return (
                     <div key={i} className="border rounded-lg p-3">
-                      <div className="aspect-square bg-muted rounded mb-2" />
+                      <div className="aspect-square bg-muted rounded mb-2 overflow-hidden">
+                        {item.croppedImage ? (
+                          <img 
+                            src={item.croppedImage} 
+                            alt={label}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <Camera className="h-8 w-8" />
+                          </div>
+                        )}
+                      </div>
                       <p className="text-sm font-medium truncate">{label}</p>
                     </div>
                   )
