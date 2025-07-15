@@ -45,10 +45,23 @@ class AIService {
     return this.isInitialized
   }
 
-  // imageToBase64 moved to server-side processing
+  private fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result)
+        } else {
+          reject(new Error('Failed to convert file to base64'))
+        }
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
 
-  private resizeImage(file: File, maxSize: number = 768): Promise<File> {
-    return new Promise((resolve) => {
+  private resizeImage(file: File, maxSize: number = 768): Promise<string> {
+    return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')!
       const img = new Image()
@@ -74,59 +87,77 @@ class AIService {
         // Draw resized image
         ctx.drawImage(img, 0, 0, width, height)
         
-        // Convert back to file
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name, { type: 'image/png' }))
-          } else {
-            resolve(file)
-          }
-        }, 'image/png', 0.9)
+        // Convert to base64
+        resolve(canvas.toDataURL('image/png', 0.9))
       }
       
+      img.onerror = reject
       img.src = URL.createObjectURL(file)
     })
   }
-
-  // Detection prompt moved to server-side API route
 
   public async analyzeImage(file: File): Promise<AIAnalysisResult> {
     const startTime = Date.now()
 
     try {
-      // Resize image for better processing
-      const resizedFile = await this.resizeImage(file)
+      console.log('Starting AI analysis for file:', file.name, 'size:', file.size)
       
-      // Create form data for API request
-      const formData = new FormData()
-      formData.append('image', resizedFile)
-
-      // Call the server-side API route
+      // Convert to base64 and resize if needed
+      const base64Image = await this.resizeImage(file)
+      console.log('Image converted to base64')
+      
+      console.log('Calling AI analysis API...')
+      // Call the server-side API route with JSON
       const response = await fetch('/api/ai/analyze', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: base64Image,
+          prompt: 'household items, furniture, electronics, books, kitchen items, decorative items'
+        })
       })
+
+      console.log('API response status:', response.status)
 
       if (!response.ok) {
         const errorData = await response.json()
+        console.error('API error response:', errorData)
         throw new Error(errorData.error || 'AI analysis failed')
       }
 
       const result = await response.json()
-      const processingTime = Date.now() - startTime
+      console.log('API result:', result)
+
+      // Transform the response to match our interface
+      const items: DetectedItem[] = result.items.map((item: any) => ({
+        boundingBox: {
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          label: item.label,
+          confidence: item.confidence
+        },
+        category: item.label.split(' ')[0], // Use first word as category
+        description: item.label,
+        metadata: {
+          condition: 'Unknown',
+          estimatedValue: 'Not assessed'
+        }
+      }))
 
       return {
-        items: result.items,
-        totalItemsDetected: result.totalItemsDetected,
-        processingTime
+        items,
+        totalItemsDetected: items.length,
+        processingTime: result.processingTime || (Date.now() - startTime)
       }
     } catch (error) {
       console.error('Error analyzing image:', error)
       throw new Error(`AI analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
-
-  // AI response parsing moved to server-side API route
 
   public async generateItemMetadata(itemName: string, imageData?: string): Promise<any> {
     try {

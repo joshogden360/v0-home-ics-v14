@@ -1,140 +1,161 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenerativeAI, Part, GenerationConfig } from '@google/generative-ai';
+
+// Get API key from environment variable
+const apiKey = process.env.GOOGLE_AI_API_KEY;
+
+if (!apiKey) {
+  console.error('GOOGLE_AI_API_KEY is not set in environment variables');
+}
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
-    const apiKey = process.env.GOOGLE_AI_API_KEY
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'AI service not configured' },
+        { error: 'API key not configured' },
         { status: 500 }
-      )
+      );
     }
 
-    const formData = await request.formData()
-    const file = formData.get('image') as File
+    const { image, prompt } = await request.json();
     
-    if (!file) {
+    if (!image) {
       return NextResponse.json(
         { error: 'No image provided' },
         { status: 400 }
-      )
+      );
     }
 
-    // Convert file to base64
-    const bytes = await file.arrayBuffer()
-    const base64 = Buffer.from(bytes).toString('base64')
+    // Initialize Gemini AI
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // Construct the detection prompt
+    const detectionPrompt = `Detect ${prompt || 'household items, furniture, electronics, books, kitchen items, decorative items'} in this image. Focus on identifying individual household items that someone would want to catalog in a home inventory. 
+    
+Output ONLY a valid JSON array where each entry is an object with exactly two fields:
+- "box_2d": an array of 4 numbers [ymin, xmin, ymax, xmax] as percentages of image dimensions from 0 to 1000
+- "label": a string with a descriptive label that includes the item type and any visible brand names or distinguishing features
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      generationConfig: {
-        temperature: 0.3,
-        topK: 32,
-        topP: 0.8,
-        maxOutputTokens: 4096,
-      }
-    })
-
-    const prompt = `Analyze this image and detect individual household items, furniture, and objects. For each item you identify, provide:
-
-1. Bounding box coordinates as percentages (0-100) in format [ymin, xmin, ymax, xmax]
-2. A descriptive label that includes item type, color, and notable features
-3. Category classification
-4. Brief description
-
-Focus on:
-- Individual items that could be inventoried
-- Furniture pieces
-- Electronics and appliances
-- Decorative objects
-- Storage containers
-- Books, artwork, plants
-- Kitchen items, tools, etc.
-
-Ignore:
-- Walls, floors, ceilings
-- Built-in fixtures
-- Very small items (< 2% of image)
-
-Output ONLY a valid JSON array with this exact structure:
+Example format:
 [
-  {
-    "box_2d": [ymin, xmin, ymax, xmax],
-    "label": "descriptive label",
-    "category": "category name",
-    "description": "brief description",
-    "metadata": {
-      "color": "primary color",
-      "material": "material if obvious",
-      "condition": "estimated condition"
-    }
-  }
+  {"box_2d": [100, 200, 300, 400], "label": "Black ceramic coffee mug"},
+  {"box_2d": [500, 600, 700, 800], "label": "Stainless steel cooking pot"}
 ]
 
-Ensure coordinates are integers between 0-100 representing percentages.`
+Ensure labels are concise and user-friendly for an inventory system. Return ONLY the JSON array, no other text.`;
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: file.type,
-          data: base64
-        }
-      },
-      { text: prompt }
-    ])
+    // Remove data URL prefix if present
+    const base64Data = image.replace(/^data:image\/[a-z]+;base64,/, '');
 
-    const response = await result.response
-    const text = response.text()
+    // Prepare the request parts
+    const requestParts: Part[] = [
+      { inlineData: { mimeType: 'image/png', data: base64Data } },
+      { text: detectionPrompt }
+    ];
 
-    // Parse and process the response
-    let cleanText = text.trim()
-    cleanText = cleanText.replace(/```json\s*/, '').replace(/```\s*$/, '')
+    // Configure generation parameters
+    const generationConfig: GenerationConfig = {
+      temperature: 0.5, // Lower temperature for more consistent results
+    };
+
+    // Use gemini-1.5-flash model for faster processing
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
-    const jsonMatch = cleanText.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) {
-      throw new Error('No JSON array found in response')
-    }
+    // Generate content
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: requestParts }],
+      generationConfig
+    });
 
-    const jsonData = JSON.parse(jsonMatch[0])
+    // Extract response text
+    const response = result.response;
+    let responseText = '';
     
-    const items = jsonData.map((item: any) => {
-      const [ymin, xmin, ymax, xmax] = item.box_2d.map(Number)
-      
-      return {
-        boundingBox: {
-          x: Math.max(0, Math.min(100, xmin)) / 100,
-          y: Math.max(0, Math.min(100, ymin)) / 100,
-          width: Math.max(0, Math.min(100, xmax - xmin)) / 100,
-          height: Math.max(0, Math.min(100, ymax - ymin)) / 100,
-          label: item.label || 'Unknown item'
-        },
-        category: item.category || 'Uncategorized',
-        description: item.description || item.label || 'No description',
-        metadata: {
-          color: item.metadata?.color,
-          material: item.metadata?.material,
-          condition: item.metadata?.condition || 'Unknown'
+    if (typeof response.text === 'function') {
+      responseText = response.text();
+    } else if (response.candidates && response.candidates[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.text) {
+          responseText += part.text;
         }
       }
-    }).filter((item: any) => {
-      const box = item.boundingBox
-      return box.width > 0.02 && box.height > 0.02 &&
-             box.x >= 0 && box.y >= 0 && 
-             box.x + box.width <= 1 && box.y + box.height <= 1
-    })
+    }
+
+    console.log('Raw AI response:', responseText);
+
+    // Clean up response text
+    if (responseText.includes('```json')) {
+      responseText = responseText.split('```json')[1].split('```')[0];
+    }
+    responseText = responseText.trim();
+
+    // Parse the response
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(responseText);
+    } catch (jsonError) {
+      // Try to extract JSON array from the response
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        try {
+          parsedResponse = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          console.error('Failed to parse extracted JSON:', e);
+          throw new Error('Failed to parse AI response as JSON');
+        }
+      } else {
+        console.error('No JSON array found in response:', responseText);
+        throw new Error('AI response does not contain valid JSON array');
+      }
+    }
+
+    // Validate response structure
+    if (!Array.isArray(parsedResponse)) {
+      throw new Error('AI response is not an array');
+    }
+
+    // Transform coordinates from 0-1000 to 0-1 range
+    const items = parsedResponse.map((item: any) => {
+      if (!item.box_2d || !item.label) {
+        console.warn('Invalid item structure:', item);
+        return null;
+      }
+
+      const [ymin, xmin, ymax, xmax] = item.box_2d;
+      return {
+        x: xmin / 1000,
+        y: ymin / 1000,
+        width: (xmax - xmin) / 1000,
+        height: (ymax - ymin) / 1000,
+        label: item.label,
+        confidence: 0.9 // Default confidence since Gemini doesn't provide it
+      };
+    }).filter(Boolean);
+
+    const processingTime = Date.now() - startTime;
 
     return NextResponse.json({
+      success: true,
       items,
-      totalItemsDetected: items.length,
-      processingTime: Date.now() - Date.now()
-    })
+      processingTime,
+      message: `Detected ${items.length} items`
+    });
 
   } catch (error) {
-    console.error('AI analysis error:', error)
+    console.error('Error in AI analysis:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const processingTime = Date.now() - startTime;
+    
     return NextResponse.json(
-      { error: 'AI analysis failed' },
+      { 
+        error: errorMessage,
+        processingTime,
+        success: false
+      },
       { status: 500 }
-    )
+    );
   }
 } 

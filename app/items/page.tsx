@@ -2,7 +2,7 @@ import { getItems } from "@/lib/actions/items-auth0-simple"
 import { Button } from "@/components/ui/button"
 import { formatDate, formatCurrency } from "@/lib/utils"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { Plus, Camera } from "lucide-react"
 import ItemsTable from "./items-table"
 
 export default async function ItemsPage() {
@@ -27,12 +27,20 @@ export default async function ItemsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Items</h1>
           <p className="text-muted-foreground">Manage your inventory items</p>
         </div>
-        <Link href="/items/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/items/create">
+            <Button>
+              <Camera className="mr-2 h-4 w-4" />
+              Create from Photo
+            </Button>
+          </Link>
+          <Link href="/items/new">
+            <Button variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Manually
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <ItemsTable items={preparedItems} />

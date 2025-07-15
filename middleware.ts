@@ -24,7 +24,9 @@ export async function middleware(request: NextRequest) {
   // Protected routes that require authentication
   const isProtectedRoute = 
     request.nextUrl.pathname === "/" ||
-    request.nextUrl.pathname.startsWith("/items") ||
+    (request.nextUrl.pathname.startsWith("/items") && 
+     request.nextUrl.pathname !== "/items/create" && 
+     request.nextUrl.pathname !== "/items/create-test") ||
     request.nextUrl.pathname.startsWith("/rooms") ||
     request.nextUrl.pathname.startsWith("/maintenance") ||
     request.nextUrl.pathname.startsWith("/documentation") ||

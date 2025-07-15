@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, Package, DoorOpen, Wrench, Tag, Settings, FileText, Brain } from "lucide-react"
+import { Home, Package, DoorOpen, Wrench, Tag, Settings, FileText, Brain, Camera } from "lucide-react"
 
 const routes = [
   {
@@ -17,9 +17,9 @@ const routes = [
     icon: Package,
   },
   {
-    label: "AI Analysis",
-    href: "/items/ai-analysis",
-    icon: Brain,
+    label: "Create Items",
+    href: "/items/create",
+    icon: Camera,
   },
   {
     label: "Rooms",

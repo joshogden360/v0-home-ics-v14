@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useAtom, useSetAtom } from "jotai"
 import { getDashboardStats } from "@/lib/actions/dashboard"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, DoorOpen, Image, AlertTriangle, Loader2 } from "lucide-react"
+import { Package, DoorOpen, Image, AlertTriangle, Loader2, Camera, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/lib/utils"
@@ -179,6 +179,39 @@ export function DashboardContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Photo to Items CTA */}
+      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <CardTitle>Quick Inventory with AI</CardTitle>
+              <CardDescription>
+                Transform any photo into organized inventory items in seconds
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Powered by Google Gemini AI</p>
+              <p className="text-xs text-muted-foreground">
+                • Automatic item detection • Smart categorization • Instant inventory
+              </p>
+            </div>
+            <Link href="/items/create">
+              <Button>
+                <Camera className="mr-2 h-4 w-4" />
+                Start Scanning
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="col-span-1">
