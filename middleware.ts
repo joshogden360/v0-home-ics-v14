@@ -25,8 +25,7 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute = 
     request.nextUrl.pathname === "/" ||
     (request.nextUrl.pathname.startsWith("/items") && 
-     request.nextUrl.pathname !== "/items/create" && 
-     request.nextUrl.pathname !== "/items/create-test") ||
+     request.nextUrl.pathname !== "/items/create") ||
     request.nextUrl.pathname.startsWith("/rooms") ||
     request.nextUrl.pathname.startsWith("/maintenance") ||
     request.nextUrl.pathname.startsWith("/documentation") ||
