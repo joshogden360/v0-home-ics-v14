@@ -1,5 +1,7 @@
 // GoogleGenerativeAI moved to server-side API route
 
+import { ImagePreprocessor } from './image-preprocessor'
+
 export interface BoundingBox {
   x: number // 0-1 normalized
   y: number // 0-1 normalized
@@ -30,8 +32,10 @@ export interface AIAnalysisResult {
 
 class AIService {
   private isInitialized = false
+  private preprocessor: ImagePreprocessor
 
   constructor() {
+    this.preprocessor = new ImagePreprocessor()
     this.initialize()
   }
 
@@ -45,66 +49,22 @@ class AIService {
     return this.isInitialized
   }
 
-  private fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result)
-        } else {
-          reject(new Error('Failed to convert file to base64'))
-        }
-      }
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-  }
-
-  private resizeImage(file: File, maxSize: number = 768): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')!
-      const img = new Image()
-      
-      img.onload = () => {
-        // Calculate new dimensions
-        let { width, height } = img
-        if (width > height) {
-          if (width > maxSize) {
-            height = (height * maxSize) / width
-            width = maxSize
-          }
-        } else {
-          if (height > maxSize) {
-            width = (width * maxSize) / height
-            height = maxSize
-          }
-        }
-        
-        canvas.width = width
-        canvas.height = height
-        
-        // Draw resized image
-        ctx.drawImage(img, 0, 0, width, height)
-        
-        // Convert to base64
-        resolve(canvas.toDataURL('image/png', 0.9))
-      }
-      
-      img.onerror = reject
-      img.src = URL.createObjectURL(file)
-    })
-  }
-
-  public async analyzeImage(file: File): Promise<AIAnalysisResult> {
+  public async analyzeImage(file: File, userPrompt?: string): Promise<AIAnalysisResult> {
     const startTime = Date.now()
 
     try {
       console.log('Starting AI analysis for file:', file.name, 'size:', file.size)
       
-      // Convert to base64 and resize if needed
-      const base64Image = await this.resizeImage(file)
-      console.log('Image converted to base64')
+      // Use the new preprocessor
+      const processed = await this.preprocessor.processImage(file)
+      console.log('Image preprocessed:', {
+        quality: processed.metadata.quality,
+        needsRotation: processed.metadata.needsRotation,
+        dimensions: `${processed.metadata.width}x${processed.metadata.height}`
+      })
+      
+      // Generate optimal prompt based on image characteristics
+      const prompt = this.preprocessor.generateOptimalPrompt(processed.metadata, userPrompt)
       
       console.log('Calling AI analysis API...')
       // Call the server-side API route with JSON
@@ -114,8 +74,8 @@ class AIService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          image: base64Image,
-          prompt: 'household items, furniture, electronics, books, kitchen items, decorative items'
+          image: processed.dataUrl,
+          prompt: prompt
         })
       })
 
@@ -156,6 +116,69 @@ class AIService {
     } catch (error) {
       console.error('Error analyzing image:', error)
       throw new Error(`AI analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * Batch analyze multiple images
+   */
+  public async analyzeBatch(files: File[], userPrompt?: string): Promise<AIAnalysisResult[]> {
+    // Process images first
+    const processedImages = await this.preprocessor.processBatch(files)
+    
+    // Analyze in parallel with rate limiting
+    const CONCURRENT_LIMIT = 2
+    const results: AIAnalysisResult[] = []
+    
+    for (let i = 0; i < processedImages.length; i += CONCURRENT_LIMIT) {
+      const batch = processedImages.slice(i, i + CONCURRENT_LIMIT)
+      const batchPromises = batch.map(async (processed, index) => {
+        const file = files[i + index]
+        const prompt = this.preprocessor.generateOptimalPrompt(processed.metadata, userPrompt)
+        
+        const response = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: processed.dataUrl, prompt })
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to analyze ${file.name}`)
+        }
+        
+        const result = await response.json()
+        return this.transformResponse(result)
+      })
+      
+      const batchResults = await Promise.all(batchPromises)
+      results.push(...batchResults)
+    }
+    
+    return results
+  }
+
+  private transformResponse(apiResult: any): AIAnalysisResult {
+    const items: DetectedItem[] = apiResult.items.map((item: any) => ({
+      boundingBox: {
+        x: item.x,
+        y: item.y,
+        width: item.width,
+        height: item.height,
+        label: item.label,
+        confidence: item.confidence
+      },
+      category: item.label.split(' ')[0],
+      description: item.label,
+      metadata: {
+        condition: 'Unknown',
+        estimatedValue: 'Not assessed'
+      }
+    }))
+
+    return {
+      items,
+      totalItemsDetected: items.length,
+      processingTime: apiResult.processingTime || 0
     }
   }
 

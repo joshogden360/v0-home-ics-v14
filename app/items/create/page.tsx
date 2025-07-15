@@ -1,5 +1,5 @@
 import { getRooms } from "@/lib/actions/rooms"
-import { PhotoToItems } from "@/components/ai/photo-to-items"
+import { PhotoToItemsMinimal } from "@/components/ai/photo-to-items-minimal"
 import { getSession } from "@/lib/session"
 import { redirect } from "next/navigation"
 
@@ -19,9 +19,5 @@ export default async function CreateItemsPage() {
     // Continue with empty rooms array
   }
 
-  return (
-    <div className="container mx-auto py-6">
-      <PhotoToItems rooms={rooms} />
-    </div>
-  )
+  return <PhotoToItemsMinimal rooms={rooms} />
 } 
