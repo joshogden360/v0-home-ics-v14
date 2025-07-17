@@ -1,5 +1,7 @@
-# Inventory Dashboard
+# The Itemizer
 ## AI-Powered Household Inventory Management
+
+![Itemizer Hero](./public/Itemizer-HERO-v1.png)
 
 *A modern web application for cataloging and managing household items using computer vision and AI*
 
