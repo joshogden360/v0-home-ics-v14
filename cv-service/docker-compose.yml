@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  cv-service:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0  # Use first GPU if available
+      - TORCH_HOME=/app/models
+      - HF_HOME=/app/models
+    volumes:
+      - ./models:/app/models  # Persist downloaded models
+      - ./temp:/app/temp      # Temporary files
+      - ./app:/app/app        # Hot reload during development
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # For development without GPU
+  cv-service-cpu:
+    build: 
+      context: .
+      dockerfile: Dockerfile.cpu
+    ports:
+      - "8001:8000"
+    environment:
+      - TORCH_HOME=/app/models
+      - HF_HOME=/app/models
+      - FORCE_CPU=true
+    volumes:
+      - ./models:/app/models
+      - ./temp:/app/temp
+      - ./app:/app/app
+    restart: unless-stopped
+    profiles:
+      - cpu-only
+
+networks:
+  default:
+    name: inventory-cv-network 
