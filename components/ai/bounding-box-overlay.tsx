@@ -1,163 +1,228 @@
 "use client"
 
-import { useCallback, useEffect, useState } from 'react'
-import { useAtomValue } from 'jotai'
-import {
-  detectedItemsAtom,
-  boundingBoxesAtom,
-  selectedDetectedItemsAtom,
-  hoveredDetectedItemAtom,
-  imageZoomAtom,
-  imagePanAtom
-} from '@/lib/atoms/ai'
+import React, { useEffect, useState, useRef } from 'react'
 
-interface BoundingBoxOverlayProps {
-  containerRef: React.RefObject<HTMLDivElement>
-  onItemClick?: (index: number) => void
-  onItemHover?: (index: number | null) => void
+interface BoundingBox {
+  x: number      // Already normalized (0-1)
+  y: number      // Already normalized (0-1)
+  width: number  // Already normalized (0-1)
+  height: number // Already normalized (0-1)
+  label: string
 }
 
-export function BoundingBoxOverlay({ 
-  containerRef, 
-  onItemClick, 
-  onItemHover 
-}: BoundingBoxOverlayProps) {
-  const detectedItems = useAtomValue(detectedItemsAtom)
-  const boundingBoxes = useAtomValue(boundingBoxesAtom)
-  const selectedItems = useAtomValue(selectedDetectedItemsAtom)
-  const hoveredItem = useAtomValue(hoveredDetectedItemAtom)
-  const zoom = useAtomValue(imageZoomAtom)
-  const pan = useAtomValue(imagePanAtom)
-  
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+interface BoundingBoxOverlayProps {
+  boundingBoxes: BoundingBox[]
+  selectedItems: Set<number>
+  onSelectItem: (index: number) => void
+  imageElement?: HTMLImageElement | null
+  showLabels?: boolean
+}
 
-  // Update container size on resize
+export function BoundingBoxOverlay({
+  boundingBoxes,
+  selectedItems,
+  onSelectItem,
+  imageElement,
+  showLabels = true
+}: BoundingBoxOverlayProps) {
+  const [imageDimensions, setImageDimensions] = useState<{
+    offsetX: number
+    offsetY: number
+    displayWidth: number
+    displayHeight: number
+  } | null>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    const updateSize = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect()
-        setContainerSize({ width: rect.width, height: rect.height })
+    if (!imageElement || !containerRef.current) return
+
+    const updateDimensions = () => {
+      const container = containerRef.current
+      if (!container) return
+
+      const containerWidth = container.clientWidth
+      const containerHeight = container.clientHeight
+      const imageAspectRatio = imageElement.naturalWidth / imageElement.naturalHeight
+      const containerAspectRatio = containerWidth / containerHeight
+
+      let displayWidth, displayHeight, offsetX, offsetY
+
+      if (imageAspectRatio > containerAspectRatio) {
+        // Image is wider - fit to width
+        displayWidth = containerWidth
+        displayHeight = containerWidth / imageAspectRatio
+        offsetX = 0
+        offsetY = (containerHeight - displayHeight) / 2
+      } else {
+        // Image is taller - fit to height
+        displayHeight = containerHeight
+        displayWidth = containerHeight * imageAspectRatio
+        offsetX = (containerWidth - displayWidth) / 2
+        offsetY = 0
       }
+
+      setImageDimensions({
+        offsetX,
+        offsetY,
+        displayWidth,
+        displayHeight
+      })
     }
 
-    updateSize()
-    window.addEventListener('resize', updateSize)
-    return () => window.removeEventListener('resize', updateSize)
-  }, [containerRef])
+    updateDimensions()
+    
+    // Update on resize
+    const resizeObserver = new ResizeObserver(updateDimensions)
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current)
+    }
 
-  const handleBoxClick = useCallback((e: React.MouseEvent, index: number) => {
-    e.stopPropagation()
-    onItemClick?.(index)
-  }, [onItemClick])
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [imageElement])
 
-  const handleBoxHover = useCallback((index: number | null) => {
-    onItemHover?.(index)
-  }, [onItemHover])
+  // Calculate adaptive label sizes and positions
+  const getAdaptiveLabelStyle = (box: BoundingBox, index: number) => {
+    if (!imageDimensions) return {}
+    
+    const actualWidth = box.width * imageDimensions.displayWidth
+    const actualHeight = box.height * imageDimensions.displayHeight
+    const boxArea = actualWidth * actualHeight
+    
+    // Determine label size based on box size and item density
+    const itemDensity = boundingBoxes.length / (imageDimensions.displayWidth * imageDimensions.displayHeight) * 10000
+    let fontSize = '11px'
+    let padding = '4px 6px'
+    
+    if (itemDensity > 15 || boxArea < 2000) {
+      fontSize = '9px'
+      padding = '2px 4px'
+    } else if (itemDensity > 8 || boxArea < 5000) {
+      fontSize = '10px'
+      padding = '3px 5px'
+    }
+    
+    return { fontSize, padding }
+  }
 
-  if (!boundingBoxes.length || !containerSize.width || !containerSize.height) {
-    return null
+  // Smart label positioning to avoid overlaps
+  const getLabelPosition = (box: BoundingBox, index: number) => {
+    if (!imageDimensions) return { top: '-24px', left: '0px' }
+    
+    const actualX = imageDimensions.offsetX + (box.x * imageDimensions.displayWidth)
+    const actualY = imageDimensions.offsetY + (box.y * imageDimensions.displayHeight)
+    const actualWidth = box.width * imageDimensions.displayWidth
+    
+    // Check for nearby boxes that might cause label overlap
+    const hasTopOverlap = boundingBoxes.some((otherBox, otherIndex) => {
+      if (otherIndex === index) return false
+      const otherY = imageDimensions.offsetY + (otherBox.y * imageDimensions.displayHeight)
+      const otherX = imageDimensions.offsetX + (otherBox.x * imageDimensions.displayWidth)
+      const otherWidth = otherBox.width * imageDimensions.displayWidth
+      
+      // Check if labels would overlap vertically and horizontally
+      return Math.abs(actualY - otherY) < 30 && 
+             Math.abs(actualX - otherX) < Math.max(actualWidth, otherWidth)
+    })
+    
+    // Position label inside box if there's overlap above, or if box is near top
+    if (hasTopOverlap || actualY < 30) {
+      return { 
+        top: '4px', 
+        left: '4px',
+        maxWidth: `${actualWidth - 8}px`
+      }
+    }
+    
+    return { top: '-24px', left: '0px' }
   }
 
   return (
-    <div className="absolute inset-0 pointer-events-none">
-      {boundingBoxes.map((box, index) => {
-        const isSelected = selectedItems.includes(index)
-        const isHovered = hoveredItem === index
-        const item = detectedItems[index]
-
-        // Calculate box position and size based on container dimensions and zoom
-        const boxStyle = {
-          left: `${box.x * 100}%`,
-          top: `${box.y * 100}%`,
-          width: `${box.width * 100}%`,
-          height: `${box.height * 100}%`,
-          transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-          transformOrigin: 'top left'
-        }
-
-        const boxClasses = [
-          'absolute border-2 pointer-events-auto cursor-pointer transition-all duration-200',
-          isSelected 
-            ? 'border-blue-500 bg-blue-500/20' 
-            : isHovered 
-              ? 'border-yellow-400 bg-yellow-400/20' 
-              : 'border-green-400 bg-green-400/10 hover:border-green-500 hover:bg-green-500/20'
-        ].join(' ')
-
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none">
+      {imageDimensions && boundingBoxes.map((box, index) => {
+        const isSelected = selectedItems.has(index)
+        const isHovered = hoveredIndex === index
+        
+        // Calculate actual position based on image dimensions
+        const actualX = imageDimensions.offsetX + (box.x * imageDimensions.displayWidth)
+        const actualY = imageDimensions.offsetY + (box.y * imageDimensions.displayHeight)
+        const actualWidth = box.width * imageDimensions.displayWidth
+        const actualHeight = box.height * imageDimensions.displayHeight
+        
+        const adaptiveStyle = getAdaptiveLabelStyle(box, index)
+        const labelPosition = getLabelPosition(box, index)
+        
         return (
-          <div key={index} className="relative">
-            {/* Bounding Box */}
-            <div
-              className={boxClasses}
-              style={boxStyle}
-              onClick={(e) => handleBoxClick(e, index)}
-              onMouseEnter={() => handleBoxHover(index)}
-              onMouseLeave={() => handleBoxHover(null)}
-            />
-            
-            {/* Label */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: `${box.x * 100}%`,
-                top: `${Math.max(0, box.y * 100 - 2)}%`,
-                transform: `scale(${Math.min(zoom, 1.5)}) translate(${pan.x}px, ${pan.y}px)`,
-                transformOrigin: 'top left'
-              }}
-            >
-              <div className={[
-                'px-2 py-1 text-xs font-medium rounded-md shadow-sm max-w-xs',
-                isSelected 
-                  ? 'bg-blue-500 text-white' 
-                  : isHovered
-                    ? 'bg-yellow-400 text-black'
-                    : 'bg-green-400 text-white'
-              ].join(' ')}>
-                <div className="truncate">
-                  {item?.category || 'Unknown'}
-                </div>
-                {item?.boundingBox.label && (
-                  <div className="text-xs opacity-90 truncate">
-                    {item.boundingBox.label}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Selection Indicator */}
-            {isSelected && (
-              <div
-                className="absolute pointer-events-none"
+          <div
+            key={index}
+            className={`absolute border-2 cursor-pointer transition-all duration-200 pointer-events-auto group ${
+              isSelected ? 'z-20' : isHovered ? 'z-10' : 'z-0'
+            }`}
+            style={{
+              left: `${actualX}px`,
+              top: `${actualY}px`,
+              width: `${actualWidth}px`,
+              height: `${actualHeight}px`,
+              borderColor: isSelected ? '#3b82f6' : isHovered ? '#f59e0b' : '#ef4444',
+              borderStyle: isSelected ? 'solid' : 'dashed',
+              backgroundColor: isSelected 
+                ? 'rgba(59, 130, 246, 0.15)' 
+                : isHovered 
+                  ? 'rgba(245, 158, 11, 0.1)' 
+                  : 'rgba(239, 68, 68, 0.05)',
+              borderWidth: isSelected ? '2px' : '1px'
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelectItem(index)
+            }}
+            onMouseEnter={() => setHoveredIndex(index)}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            {/* Label with adaptive positioning and sizing */}
+            {showLabels && (
+              <div 
+                className={`absolute font-medium rounded shadow-sm transition-all duration-200 ${
+                  labelPosition.maxWidth ? 'truncate' : 'whitespace-nowrap'
+                } ${
+                  isSelected || isHovered ? 'opacity-100 scale-100' : 'opacity-90 group-hover:opacity-100 group-hover:scale-105'
+                }`}
                 style={{
-                  left: `${(box.x + box.width) * 100 - 1.5}%`,
-                  top: `${box.y * 100}%`,
-                  transform: `scale(${Math.min(zoom, 1.5)}) translate(${pan.x}px, ${pan.y}px)`,
-                  transformOrigin: 'top right'
+                  backgroundColor: isSelected 
+                    ? '#3b82f6' 
+                    : isHovered 
+                      ? '#f59e0b' 
+                      : '#ef4444',
+                  color: 'white',
+                  ...adaptiveStyle,
+                  ...labelPosition
                 }}
               >
-                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg">
-                  ✓
-                </div>
+                {box.label}
               </div>
             )}
-
-            {/* Item Index */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: `${box.x * 100}%`,
-                top: `${box.y * 100}%`,
-                transform: `scale(${Math.min(zoom, 1.5)}) translate(${pan.x}px, ${pan.y}px)`,
-                transformOrigin: 'top left'
-              }}
-            >
-              <div className="w-6 h-6 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center text-xs font-bold text-gray-700 shadow-sm">
-                {index + 1}
-              </div>
-            </div>
+            
+            {/* Selection indicator */}
+            {isSelected && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm" />
+            )}
+            
+            {/* Hover indicator for better visibility */}
+            {isHovered && !isSelected && (
+              <div className="absolute inset-0 border-2 border-amber-400 rounded animate-pulse" />
+            )}
           </div>
         )
       })}
+      
+      {/* Item count indicator */}
+      {boundingBoxes.length > 0 && (
+        <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded pointer-events-none">
+          {boundingBoxes.length} items
+        </div>
+      )}
     </div>
   )
 } 

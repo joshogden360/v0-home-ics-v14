@@ -2,8 +2,37 @@
 
 import { sql } from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { getSession } from "@/lib/session"
 import type { Item } from "@/lib/types"
 import type { DetectedItem } from "@/lib/services/ai-service"
+
+// Helper to get user database ID from Auth0 ID
+async function getUserIdFromAuth0(auth0Id: string): Promise<number | null> {
+  try {
+    const result = await sql`
+      SELECT user_id FROM users WHERE auth0_id = ${auth0Id}
+    `
+    return result[0]?.user_id || null
+  } catch (error) {
+    console.error('Error getting user ID:', error)
+    return null
+  }
+}
+
+// Helper to ensure user is authenticated and get their database ID
+async function getAuthenticatedUserId(): Promise<number> {
+  const session = await getSession()
+  if (!session?.auth0Id) {
+    throw new Error('User not authenticated')
+  }
+  
+  const userId = await getUserIdFromAuth0(session.auth0Id)
+  if (!userId) {
+    throw new Error('User not found in database')
+  }
+  
+  return userId
+}
 
 export type ItemFormData = {
   name: string
@@ -43,10 +72,13 @@ export async function createItem(formData: FormData) {
   const data = Object.fromEntries(formData.entries()) as unknown as ItemFormData & { room_id?: string }
 
   try {
-    // First, create the item with all fields
+    // Get authenticated user ID
+    const userId = await getAuthenticatedUserId()
+
+    // First, create the item with all fields including user_id
     const result = await sql`
       INSERT INTO items (
-        name, description, category, purchase_date, 
+        user_id, name, description, category, purchase_date, 
         purchase_price, condition, notes,
         purchased_from, serial_number, warranty_provider,
         warranty_expiration, storage_location, current_value,
@@ -54,6 +86,7 @@ export async function createItem(formData: FormData) {
         insurance_policy, insurance_coverage, insurance_category,
         needs_maintenance, maintenance_interval, maintenance_instructions
       ) VALUES (
+        ${userId},
         ${name},
         ${data.description || null},
         ${data.category || null},
@@ -105,6 +138,48 @@ export async function createItem(formData: FormData) {
           'Initial placement'
         )
       `
+    }
+
+    // Handle photo uploads
+    const photos = formData.getAll('photos') as File[]
+    if (photos && photos.length > 0) {
+      try {
+        const { put } = await import('@vercel/blob')
+        
+        for (const photo of photos) {
+          if (photo && photo.size > 0) {
+            try {
+              // Upload to Vercel Blob
+              const blob = await put(`items/${itemId}/${photo.name}`, photo, {
+                access: 'public',
+                addRandomSuffix: true
+              })
+              
+              // Save media record
+              await sql`
+                INSERT INTO media (
+                  item_id, media_type, file_path, file_name, 
+                  file_size, mime_type
+                ) VALUES (
+                  ${itemId},
+                  'image',
+                  ${blob.url},
+                  ${photo.name},
+                  ${photo.size},
+                  ${photo.type}
+                )
+              `
+            } catch (uploadError) {
+              console.error('Error uploading photo:', uploadError)
+              // Continue with other photos even if one fails
+            }
+          }
+        }
+      } catch (blobError) {
+        console.log('Vercel Blob not configured, skipping photo upload')
+        // If Vercel Blob is not configured, we just skip photo uploads
+        // The item is still created successfully
+      }
     }
 
     revalidatePath("/items")

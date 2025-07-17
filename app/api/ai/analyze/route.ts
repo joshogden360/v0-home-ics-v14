@@ -4,6 +4,9 @@ import { GoogleGenerativeAI, Part, GenerationConfig } from '@google/generative-a
 // Get API key from environment variable
 const apiKey = process.env.GOOGLE_AI_API_KEY;
 
+// Allow overriding the Gemini model via env; default to the latest accurate model
+const GEMINI_MODEL_NAME = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-pro';
+
 if (!apiKey) {
   console.error('GOOGLE_AI_API_KEY is not set in environment variables');
 }
@@ -60,8 +63,8 @@ Ensure labels are concise and user-friendly for an inventory system. Return ONLY
       temperature: 0.5, // Lower temperature for more consistent results
     };
 
-    // Use gemini-1.5-flash model for faster processing
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Use the specified Gemini model (default: gemini-1.5-pro for higher accuracy)
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME });
     
     // Generate content
     const result = await model.generateContent({
@@ -91,19 +94,62 @@ Ensure labels are concise and user-friendly for an inventory system. Return ONLY
     }
     responseText = responseText.trim();
 
+    // Additional cleaning for Gemini 2.5 Pro responses
+    // Fix common JSON syntax errors
+    responseText = responseText
+      .replace(/,\s*}/g, '}')  // Remove trailing commas
+      .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
+      .replace(/"label":\s*"label":/g, '"label":')  // Fix duplicate label keys
+      .replace(/"label":\s*"([^"]*)",\s*"label":\s*"([^"]*)"/g, '"label": "$2"')  // Fix duplicate labels
+      .replace(/}\s*{/g, '}, {')  // Add missing commas between objects
+      .replace(/]\s*\[/g, '], [')  // Add missing commas between arrays
+
     // Parse the response
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(responseText);
     } catch (jsonError) {
-      // Try to extract JSON array from the response
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      console.error('JSON parsing failed, attempting repair:', jsonError);
+      console.error('Response text:', responseText);
+      
+      // Try to extract and repair JSON array from the response
+      let jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
+        let jsonText = jsonMatch[0];
+        
+        // Additional repair attempts
+        jsonText = jsonText
+          .replace(/"\s*}/g, '"}')  // Fix unterminated strings
+          .replace(/{\s*"/g, '{"')  // Fix object start
+          .replace(/,\s*,/g, ',')  // Remove double commas
+          .replace(/:\s*,/g, ': "",')  // Fix empty values
+        
         try {
-          parsedResponse = JSON.parse(jsonMatch[0]);
+          parsedResponse = JSON.parse(jsonText);
         } catch (e) {
-          console.error('Failed to parse extracted JSON:', e);
-          throw new Error('Failed to parse AI response as JSON');
+          console.error('Failed to parse repaired JSON:', e);
+          console.error('Repaired JSON text:', jsonText);
+          
+          // Last resort: try to manually extract box_2d and label pairs
+          try {
+            const boxMatches = jsonText.match(/"box_2d":\s*\[([^\]]+)\]/g);
+            const labelMatches = jsonText.match(/"label":\s*"([^"]+)"/g);
+            
+            if (boxMatches && labelMatches) {
+              parsedResponse = boxMatches.map((boxMatch, index) => {
+                const coordMatch = boxMatch.match(/\[([^\]]+)\]/);
+                const coords = coordMatch ? coordMatch[1].split(',').map(n => parseInt(n.trim())) : [0, 0, 100, 100];
+                const labelMatch = labelMatches[index]?.match(/"([^"]+)"/);
+                const label = labelMatch ? labelMatch[1] : 'Unknown item';
+                return { box_2d: coords, label };
+              });
+            } else {
+              throw new Error('Could not extract valid items from response');
+            }
+          } catch (extractError) {
+            console.error('Manual extraction failed:', extractError);
+            throw new Error('Failed to parse AI response as JSON');
+          }
         }
       } else {
         console.error('No JSON array found in response:', responseText);

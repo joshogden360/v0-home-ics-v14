@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Camera, Upload, Grid3X3, Zap, ChevronRight } from 'lucide-react'
+import { Camera, Upload, Grid3X3, Zap, ChevronRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { QuickCapture } from './quick-capture'
 import { BulkUpload } from './bulk-upload'
@@ -29,11 +29,18 @@ interface DetectedItemWithImage {
   originalImage?: string
 }
 
+interface SavedItem {
+  id: string
+  name: string
+  timestamp: Date
+}
+
 export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
   const router = useRouter()
   const [mode, setMode] = useState<'quick' | 'bulk' | null>(null)
   const [currentImage, setCurrentImage] = useState<string | null>(null)
   const [detectedItems, setDetectedItems] = useState<DetectedItemWithImage[]>([])
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([])
   const [isSaving, setIsSaving] = useState(false)
 
   const handleQuickCapture = async (items: any[], originalImage?: string) => {
@@ -119,17 +126,19 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
       
       const result = await createItem(formData)
       
-      if (result.success) {
+      if (result.success && result.id) {
         console.log('Item saved successfully:', label)
-        // Navigate to the items page to see the new item
-        setTimeout(() => {
-          router.push('/items')
-        }, 1000)
+        // Add to saved items list
+        setSavedItems(prev => [...prev, {
+          id: result.id,
+          name: label,
+          timestamp: new Date()
+        }])
       } else {
         console.error('Failed to save item:', result.error)
       }
     } catch (error) {
-      console.error('Failed to save item:', error)
+      console.error('Error saving item:', error)
     } finally {
       setIsSaving(false)
     }
@@ -229,8 +238,18 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
               ← Back
             </button>
             <h2 className="text-sm font-medium">Quick Capture</h2>
-            <div className="text-sm text-muted-foreground">
-              {detectedItems.length} items
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                {savedItems.length} saved
+              </div>
+              {savedItems.length > 0 && (
+                <button
+                  onClick={() => router.push('/items')}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  View All Items →
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -250,8 +269,14 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {detectedItems.slice(-6).map((item, i) => {
                   const label = item.boundingBox?.label || item.label || 'Unknown item'
+                  const isSaved = savedItems.some(saved => saved.name === label)
                   return (
-                    <div key={i} className="border rounded-lg p-3">
+                    <div key={i} className="border rounded-lg p-3 relative">
+                      {isSaved && (
+                        <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 z-10">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
                       <div className="aspect-square bg-muted rounded mb-2 overflow-hidden">
                         {item.croppedImage ? (
                           <img 
@@ -266,6 +291,7 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
                         )}
                       </div>
                       <p className="text-sm font-medium truncate">{label}</p>
+                      {isSaving && <p className="text-xs text-muted-foreground">Saving...</p>}
                     </div>
                   )
                 })}
@@ -274,7 +300,7 @@ export function PhotoToItemsMinimal({ rooms = [] }: PhotoToItemsMinimalProps) {
           )}
         </div>
 
-        {/* Quick Capture Button */}
+        {/* Quick Capture Component */}
         <QuickCapture onItemsDetected={handleQuickCapture} />
       </div>
     )

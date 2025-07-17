@@ -1,23 +1,18 @@
-import { getRooms } from "@/lib/actions/rooms"
-import { PhotoToItemsMinimal } from "@/components/ai/photo-to-items-minimal"
-import { getSession } from "@/lib/session"
-import { redirect } from "next/navigation"
+import { PhotoToItemsWorkflow } from '@/components/ai/photo-to-items-workflow'
 
-export default async function CreateItemsPage() {
-  // Check authentication
-  const session = await getSession()
-  if (!session) {
-    redirect("/login")
-  }
-
-  // Fetch rooms for the form with error handling
-  let rooms: any[] = []
-  try {
-    rooms = await getRooms()
-  } catch (error) {
-    console.error("Error fetching rooms:", error)
-    // Continue with empty rooms array
-  }
-
-  return <PhotoToItemsMinimal rooms={rooms} />
+export default function CreateItemsPage() {
+  return (
+    <div className="h-[calc(100vh-4rem)] flex flex-col p-4"> {/* Account for nav height with padding */}
+      <div className="mb-3">
+        <h1 className="text-xl font-bold tracking-tight">Create Items from Photos</h1>
+        <p className="text-xs text-muted-foreground">
+          Upload photos to automatically detect and add items to your inventory
+        </p>
+      </div>
+      
+      <div className="flex-1 min-h-0">
+        <PhotoToItemsWorkflow />
+      </div>
+    </div>
+  )
 } 
